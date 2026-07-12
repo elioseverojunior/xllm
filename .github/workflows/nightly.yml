@@ -1,0 +1,110 @@
+name: Nightly Fuzz & Bench
+
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fuzz:
+    name: Fuzz
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@efcb852328a9f50117170cc43094fb6f09eaf1ae  # nightly
+
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
+
+      - name: Check for fuzz targets
+        id: has-fuzz
+        run: |
+          if [ -d fuzz ] || ls crates/*-fuzz/Cargo.toml 2>/dev/null; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install cargo-fuzz
+        if: steps.has-fuzz.outputs.found == 'true'
+        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853  # v2.83.2
+        with:
+          tool: cargo-fuzz
+
+      - name: List targets
+        if: steps.has-fuzz.outputs.found == 'true'
+        id: list-targets
+        run: |
+          targets=$(cargo +nightly fuzz list 2>/dev/null | tr '\n' ' ')
+          echo "targets=$targets" >> "$GITHUB_OUTPUT"
+
+      - name: Run fuzzer (5 min each)
+        if: steps.has-fuzz.outputs.found == 'true'
+        run: |
+          for target in ${{ steps.list-targets.outputs.targets }}; do
+            echo "Fuzzing $target for 300s..."
+            cargo +nightly fuzz run "$target" -- -max_total_time=300
+          done
+
+      - name: Upload crash artifacts
+        if: failure() && steps.has-fuzz.outputs.found == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: fuzz-crash
+          path: fuzz/artifacts/
+
+  bench:
+    name: Benchmarks
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30  # stable
+
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
+
+      - name: Check for benchmarks
+        id: has-benches
+        run: |
+          if find crates -type d -name benches 2>/dev/null | grep -q .; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run benchmarks
+        if: steps.has-benches.outputs.found == 'true'
+        run: cargo bench --workspace
+
+      - name: Upload results
+        if: steps.has-benches.outputs.found == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: criterion-results
+          path: target/criterion/
+
+  miri:
+    name: Miri (UB / strict-provenance)
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@efcb852328a9f50117170cc43094fb6f09eaf1ae  # nightly
+        with:
+          components: miri
+
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
+
+      - name: cargo miri test
+        run: cargo +nightly miri test --workspace
+        env:
+          MIRIFLAGS: "-Zmiri-strict-provenance"

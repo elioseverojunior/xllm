@@ -1,0 +1,15 @@
+[package]
+description = "Token sampling strategies (greedy, top-k, top-p, temperature)"
+edition.workspace = true
+license.workspace = true
+name = "xllm-sampling"
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+xllm-tensor.workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["xllm-tensor"]

@@ -1,0 +1,15 @@
+[package]
+description = "Model quantization formats (Q4_0, Q5_1, Q8_0, etc.)"
+edition.workspace = true
+license.workspace = true
+name = "xllm-quantize"
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+xllm-tensor.workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["xllm-tensor"]

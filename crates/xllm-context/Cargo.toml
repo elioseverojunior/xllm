@@ -1,0 +1,17 @@
+[package]
+description = "Inference context with KV cache management for transformer models"
+edition.workspace = true
+license.workspace = true
+name = "xllm-context"
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+xllm-ggml.workspace = true
+xllm-model.workspace = true
+xllm-tensor.workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["xllm-ggml", "xllm-model", "xllm-tensor"]

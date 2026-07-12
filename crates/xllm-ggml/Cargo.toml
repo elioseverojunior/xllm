@@ -1,0 +1,16 @@
+[package]
+description = "Compute graph backend matching the llama.cpp GGML API"
+edition.workspace = true
+license.workspace = true
+name = "xllm-ggml"
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+rayon.workspace = true
+xllm-tensor.workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["rayon", "xllm-tensor"]

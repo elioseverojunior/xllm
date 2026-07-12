@@ -1,0 +1,41 @@
+[workspace]
+members = [
+    "crates/xllm",
+    "crates/xllm-bitnet",
+    "crates/xllm-cli",
+    "crates/xllm-context",
+    "crates/xllm-ggml",
+    "crates/xllm-model",
+    "crates/xllm-quantize",
+    "crates/xllm-sampling",
+    "crates/xllm-tensor",
+    "crates/xllm-tokenizer",
+    "crates/xllm-train",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+version = "0.1.0"
+
+[workspace.lints.rust]
+unexpected_cfgs = "deny"
+unsafe_code = "deny"
+warnings = "deny"
+
+[workspace.dependencies]
+byteorder = "1"
+half = "2"
+memmap2 = "0.9"
+rayon = "1"
+xllm = { path = "crates/xllm" }
+xllm-bitnet = { path = "crates/xllm-bitnet" }
+xllm-context = { path = "crates/xllm-context" }
+xllm-ggml = { path = "crates/xllm-ggml" }
+xllm-model = { path = "crates/xllm-model" }
+xllm-quantize = { path = "crates/xllm-quantize" }
+xllm-sampling = { path = "crates/xllm-sampling" }
+xllm-tensor = { path = "crates/xllm-tensor" }
+xllm-tokenizer = { path = "crates/xllm-tokenizer" }
+xllm-train = { path = "crates/xllm-train" }

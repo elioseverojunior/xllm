@@ -1,0 +1,114 @@
+name: Performance
+
+# Per-change benchmark gate. Compares the PR/commit against the baseline
+# stored on the `gh-pages` branch and fails the run on a measurable
+# regression. The baseline is only updated by pushes to `main`.
+#
+# Skips cleanly when no benchmarks are defined yet (no benches/ directory
+# in any workspace crate).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  deployments: write
+
+concurrency:
+  group: performance-${{ github.ref_name }}
+  cancel-in-progress: ${{ github.ref_name != github.event.repository.default_branch }}
+
+env:
+  CARGO_TERM_COLOR: always
+  CRITERION_HOME: ${{ github.workspace }}/target/criterion
+
+jobs:
+  benchmark:
+    name: Bench vs main baseline
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30  # stable
+
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
+        with:
+          shared-key: perf
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Check for benchmarks
+        id: has-benches
+        run: |
+          if find crates -type d -name benches 2>/dev/null | grep -q .; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Print runner profile
+        if: steps.has-benches.outputs.found == 'true'
+        run: |
+          echo "CPUs: $(nproc)"
+          echo "Mem:  $(free -h | awk '/Mem:/ {print $2}')" || true
+          uname -a
+          rustc --version
+
+      - name: Build benchmarks
+        if: steps.has-benches.outputs.found == 'true'
+        run: cargo bench --workspace --no-run
+
+      - name: Run benchmarks (bencher output format)
+        if: steps.has-benches.outputs.found == 'true'
+        run: |
+          cargo bench --workspace -- --output-format bencher \
+            | tee bench-output.txt
+
+      - name: Sanity-check parseable output
+        if: steps.has-benches.outputs.found == 'true'
+        run: |
+          if ! grep -q "ns/iter" bench-output.txt; then
+            echo "::error::No 'ns/iter' lines found in bench-output.txt."
+            tail -n 50 bench-output.txt
+            exit 1
+          fi
+          echo "Parsed $(grep -c 'ns/iter' bench-output.txt) measurements."
+
+      - name: Compare against baseline
+        if: steps.has-benches.outputs.found == 'true'
+        uses: benchmark-action/github-action-benchmark@52576c92bccf6ac60c8223ec7eb2565637cae9ba  # v1.22.1
+        with:
+          name: xllm benchmarks
+          tool: cargo
+          output-file-path: bench-output.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          gh-pages-branch: gh-pages
+          benchmark-data-dir-path: benchmarks
+          auto-push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          save-data-file: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          alert-threshold: "150%"
+          fail-threshold: "200%"
+          fail-on-alert: true
+          summary-always: true
+          comment-on-alert: true
+          alert-comment-cc-users: "@${{ github.repository_owner }}"
+
+      - name: Upload Criterion HTML reports
+        if: steps.has-benches.outputs.found == 'true' && always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: criterion-reports-${{ github.run_id }}
+          path: target/criterion/
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Upload bencher-format measurements
+        if: steps.has-benches.outputs.found == 'true' && always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: bench-output-${{ github.run_id }}
+          path: bench-output.txt
+          retention-days: 90

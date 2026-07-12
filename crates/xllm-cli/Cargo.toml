@@ -1,0 +1,15 @@
+[package]
+description = "Command-line interface for xllm inference engine"
+edition.workspace = true
+license.workspace = true
+name = "xllm-cli"
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+xllm.workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["xllm"]

@@ -1,0 +1,13 @@
+{
+  "name": "xllm",
+  "private": true,
+  "scripts": {
+    "lint:md": "markdownlint-cli2",
+    "fix:md": "markdownlint-cli2 --fix"
+  },
+  "devDependencies": {
+    "@github/markdownlint-github": "^0.8.3",
+    "markdown-it": "^14.3.0",
+    "markdownlint-cli2": "^0.23.0",
+    "markdownlint-cli2-formatter-pretty": "^0.0.10"  }
+}

@@ -1,0 +1,15 @@
+[package]
+description = "BPE and SentencePiece tokenizer for LLM text processing"
+edition.workspace = true
+license.workspace = true
+name = "xllm-tokenizer"
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+byteorder.workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["byteorder"]

@@ -1,0 +1,18 @@
+[package]
+description = "Training and fine-tuning support for xllm models"
+edition.workspace = true
+license.workspace = true
+name = "xllm-train"
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+xllm-context.workspace = true
+xllm-ggml.workspace = true
+xllm-model.workspace = true
+xllm-tensor.workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["xllm-context", "xllm-ggml", "xllm-model", "xllm-tensor"]

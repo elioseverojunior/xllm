@@ -1,0 +1,216 @@
+name: Publish to crates.io
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (e.g., 0.1.0)"
+        required: true
+        type: string
+      dry_run:
+        description: "Perform a dry run without publishing"
+        required: false
+        type: boolean
+        default: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+  id-token: write
+  pages: write
+  pull-requests: write
+
+jobs:
+  validate:
+    name: Validate Release
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    outputs:
+      should_publish: ${{ steps.check.outputs.should_publish }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: "0"
+          fetch-tags: true
+          token: ${{ github.token }}
+          submodules: true
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+            VERSION="${VERSION#v}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Version to publish: ${VERSION}"
+
+      - name: Check if should publish
+        id: check
+        run: |
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            echo "Dry run mode - will not publish"
+          else
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            echo "Will proceed with publishing"
+          fi
+
+  publish-crates:
+    name: Publish crates to crates.io
+    needs: [validate]
+    if: needs.validate.outputs.should_publish == 'true'
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    environment: crates-io
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: "0"
+          fetch-tags: true
+          token: ${{ github.token }}
+          submodules: true
+
+      - name: GitHub Actions Bot Setup
+        uses: ./.github/actions/bot-setup
+
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30  # stable
+
+      - name: Crates.io Authentication
+        id: crates-auth
+        if: github.event.inputs.dry_run != 'true'
+        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18  # v1.0.5
+
+      - name: Verify packages
+        run: |
+          for c in \
+            xllm-tensor \
+            xllm-ggml \
+            xllm-model \
+            xllm-tokenizer \
+            xllm-bitnet \
+            xllm-quantize \
+            xllm-sampling \
+            xllm-context \
+            xllm-train \
+            xllm \
+            xllm-cli; do
+            echo "Verifying $c..."
+            cargo package -p "$c" --verbose
+          done
+
+      - name: Publish to crates.io (dependency order)
+        if: github.event.inputs.dry_run != 'true'
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-auth.outputs.token }}
+        run: |
+          for c in \
+            xllm-tensor \
+            xllm-ggml \
+            xllm-model \
+            xllm-tokenizer \
+            xllm-bitnet \
+            xllm-quantize \
+            xllm-sampling \
+            xllm-context \
+            xllm-train \
+            xllm \
+            xllm-cli; do
+            echo "Publishing $c..."
+            cargo publish -p "$c" --token "${CARGO_REGISTRY_TOKEN}" --verbose
+            echo "Waiting for crates.io to index..."
+            sleep 30
+          done
+
+      - name: Dry run verification
+        if: github.event.inputs.dry_run == 'true'
+        run: echo "Dry run - packages verified but not published"
+
+  publish-docs:
+    name: Publish Documentation
+    needs: [validate, publish-crates]
+    if: |
+      success() &&
+      needs.publish-crates.result == 'success' &&
+      needs.validate.outputs.should_publish == 'true'
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: "0"
+          fetch-tags: true
+          token: ${{ github.token }}
+          submodules: true
+
+      - name: GitHub Actions Bot Setup
+        uses: ./.github/actions/bot-setup
+
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30  # stable
+
+      - name: Build documentation
+        run: |
+          cargo doc --all-features --no-deps
+          echo '<meta http-equiv="refresh" content="0; url=xllm/index.html">' > target/doc/index.html
+
+      - name: Upload artifact for GitHub Pages
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9  # v5.0.0
+        with:
+          path: target/doc
+
+      - name: Deploy to GitHub Pages
+        if: github.event.inputs.dry_run != 'true'
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128  # v5.0.0
+        with:
+          token: ${{ github.token }}
+
+      - name: Documentation URLs
+        run: |
+          echo "Documentation URLs:"
+          echo "  - docs.rs: https://docs.rs/xllm/${{ needs.validate.outputs.version }}"
+          echo "  - Latest: https://docs.rs/xllm/latest"
+          echo "  - GitHub Pages: https://${{ github.repository_owner }}.github.io/xllm/"
+
+  summary:
+    name: Publication Summary
+    needs: [validate, publish-crates, publish-docs]
+    if: always()
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - name: Summary
+        run: |
+          echo "# Publication Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.validate.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.publish-crates.result }}" = "success" ]; then
+            echo "**crates.io:** Published" >> $GITHUB_STEP_SUMMARY
+            echo "  - View: https://crates.io/crates/xllm/${{ needs.validate.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.publish-crates.result }}" = "skipped" ]; then
+            echo "**crates.io:** Skipped (dry run)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**crates.io:** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.publish-docs.result }}" = "success" ]; then
+            echo "**Documentation:** Published" >> $GITHUB_STEP_SUMMARY
+            echo "  - docs.rs: https://docs.rs/xllm/latest" >> $GITHUB_STEP_SUMMARY
+            echo "  - GitHub Pages: https://${{ github.repository_owner }}.github.io/xllm/" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.publish-docs.result }}" = "skipped" ]; then
+            echo "**Documentation:** Skipped (dry run)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Documentation:** Failed" >> $GITHUB_STEP_SUMMARY
+          fi

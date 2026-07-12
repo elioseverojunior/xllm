@@ -1,0 +1,15 @@
+[package]
+description = "Tensor operations for LLM inference (matmul, reshape, slicing, etc.)"
+edition.workspace = true
+license.workspace = true
+name = "xllm-tensor"
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+half.workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["half"]

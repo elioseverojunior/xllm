@@ -1,0 +1,10 @@
+SPDX-PackageDownloadLocation = "https://github.com/elioetibr/xllm"
+SPDX-PackageName = "xllm"
+SPDX-PackageSupplier = "XLLM contributors"
+version = 1
+
+[[annotations]]
+SPDX-FileCopyrightText = "2026 Elio Severo Junior and contributors"
+SPDX-License-Identifier = "MIT OR Apache-2.0"
+path = ["**"]
+precedence = "aggregate"

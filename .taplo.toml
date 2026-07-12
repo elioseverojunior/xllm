@@ -1,0 +1,9 @@
+[formatting]
+indent_string = "  "
+indent_table = true
+reorder_keys = true
+
+[schema]
+# Cargo.toml uses [lints.rust] which the SchemaStore schema doesn't recognize.
+# Disable schema validation to suppress false-positive warnings.
+enabled = false

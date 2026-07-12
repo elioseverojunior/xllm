@@ -1,0 +1,13 @@
+### Ignored
+
+/target
+node_modules/
+
+/worktree/
+/.worktree/
+/worktrees/
+/.worktrees/
+
+### Always add
+!opencode.json
+scripts/__pycache__/update-actions-pins.cpython-314.pyc

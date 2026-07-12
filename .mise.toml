@@ -1,0 +1,14 @@
+# mise tasks for xllm
+# https://mise.jdx.dev
+
+[tasks.commit-config]
+depends = []
+description = "Regenerate committed.toml, cliff.toml, .gitmessage from commit-types.toml"
+outputs = ["committed.toml", "cliff.toml", ".gitmessage"]
+run = "python3 scripts/commit-config.py"
+sources = ["commit-types.toml"]
+
+[tasks."commit-config:check"]
+description = "Drift guard: fail if derived files are stale vs commit-types.toml"
+run = "python3 scripts/commit-config.py check"
+sources = ["commit-types.toml", "scripts/commit-config.py"]

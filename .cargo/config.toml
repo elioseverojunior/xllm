@@ -1,0 +1,30 @@
+[build]
+# Warnings as errors enforced via Cargo.toml [lints], kept here for build-rs
+# and any crate that isn't covered by Cargo.toml's lint table.
+rustflags = ["-D", "warnings"]
+
+[profile.dev]
+opt-level = 1
+incremental = true
+debug = true
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+debug = false
+
+# Target-specific linker improvements.
+# macOS ARM (Apple Silicon) — use the system ld64
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-Wl,-dead_strip_dylibs"]
+
+# macOS x86_64
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-arg=-Wl,-dead_strip_dylibs"]
+
+# Linux x86_64 — use mold if available for faster linking
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]
