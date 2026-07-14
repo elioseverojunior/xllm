@@ -10,6 +10,8 @@ on:
   pull_request:
     branches: [main]
 
+permissions: read-all
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -140,6 +142,9 @@ jobs:
   coverage:
     name: Coverage
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      actions: write
+      contents: read
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
