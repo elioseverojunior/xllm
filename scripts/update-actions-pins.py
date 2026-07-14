@@ -9,15 +9,21 @@ of the latest public release.  Only updates within the same major version
 bump but does **not** rewrite it.  Branch-based refs (``@stable``,
 ``@nightly``) are resolved to the branch-tip SHA every time.
 
+Uses async HTTP (httpx) and parallel file I/O for performance.
+
 Requires ``GITHUB_TOKEN`` (or ``GH_TOKEN``) env var for authenticated API
-requests — unauthenticated clients are rate-limited to 60 requests/hour,
+requests --- unauthenticated clients are rate-limited to 60 requests/hour,
 which is quickly exhausted by a multi-repo scan.
 
 Usage
 -----
-    python3 scripts/update-actions-pins.py          # check-only (dry-run)
-    python3 scripts/update-actions-pins.py --write  # write changes
+    python3 scripts/update-actions-pins.py                        # check-only (dry-run)
+    python3 scripts/update-actions-pins.py --write                # write changes
+    python3 scripts/update-actions-pins.py -v                     # debug output
+    python3 scripts/update-actions-pins.py -q                     # warnings / errors only
     python3 scripts/update-actions-pins.py --write --apply-major
+    python3 scripts/update-actions-pins.py --config my-pins.toml  # custom config
+    python3 scripts/update-actions-pins.py --print-config         # show effective config
 
 Exit code
 ---------
@@ -28,44 +34,199 @@ Exit code
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 import re
 import sys
 import time
-import urllib.error
-import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
+import httpx
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # ---------------------------------------------------------------------------
-# Data
+# Logging
 # ---------------------------------------------------------------------------
 
-# Actions that use branch refs instead of version tags.
-# Key = repo, value = list of valid branch names to check.
-BRANCH_ONLY_REPOS: dict[str, list[str]] = {
-    "dtolnay/rust-toolchain": ["stable", "nightly"],
+LOG_ERROR = 40
+LOG_WARN = 30
+LOG_INFO = 20
+LOG_DEBUG = 10
+_DEFAULT_LOG_LEVEL = LOG_INFO
+
+
+@dataclass
+class Logger:
+    """Minimal leveled logger.  Use module-level ``log`` singleton."""
+
+    level: int = field(default=_DEFAULT_LOG_LEVEL)
+    _name: str = field(default="pins")
+
+    def error(self, msg: str) -> None:
+        if self.level <= LOG_ERROR:
+            print(f"ERR  {msg}", file=sys.stderr)
+
+    def warn(self, msg: str) -> None:
+        if self.level <= LOG_WARN:
+            print(f"WARN {msg}", file=sys.stderr)
+
+    def info(self, msg: str) -> None:
+        if self.level <= LOG_INFO:
+            print(msg)
+
+    def debug(self, msg: str) -> None:
+        if self.level <= LOG_DEBUG:
+            print(f"DBG  {msg}", file=sys.stderr)
+
+
+log: Logger = Logger()
+
+# ---------------------------------------------------------------------------
+# Config file loader
+# ---------------------------------------------------------------------------
+
+_CONFIG_DIRS = [
+    REPO_ROOT / ".github",
+    REPO_ROOT,
+]
+
+_CONFIG_FILES = ["action-pins.toml", "action-pins.yaml", "action-pins.yml", "action-pins.json"]
+
+_DEFAULT_CONFIG_RAW: dict[str, Any] = {
+    "branch_only_repos": {"dtolnay/rust-toolchain": ["stable", "nightly"]},
+    "branch_overrides": {"nightly": "nightly"},
+    "ref_overrides": {"github/codeql-action": "v3"},
+    "reusable_paths": [
+        "slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml",
+    ],
+    "max_concurrent_api": 10,
 }
 
-# Branch overrides — when a ref like ``@nightly`` is used, resolve that branch.
-BRANCH_OVERRIDES: dict[str, str] = {
-    "nightly": "nightly",
+
+def _try_load_toml(path: Path) -> dict | None:
+    """Load TOML via ``tomllib`` (3.11+) or ``tomli``."""
+    for mod_name in ("tomllib", "tomli"):
+        try:
+            mod = __import__(mod_name)
+            with path.open("rb") as f:
+                return mod.load(f)
+        except ImportError:
+            continue
+        except Exception:
+            log.debug(f"failed to parse {path}")
+            return None
+    return None
+
+
+def _try_load_yaml(path: Path) -> dict | None:
+    """Load YAML via ``yaml`` (pyyaml)."""
+    try:
+        import yaml  # type: ignore[import-untyped]  # noqa: PLC0415
+
+        with path.open() as f:
+            return yaml.safe_load(f)
+    except ImportError:
+        return None
+    except Exception:
+        log.debug(f"failed to parse {path}")
+        return None
+
+
+def _try_load_json(path: Path) -> dict | None:
+    try:
+        with path.open() as f:
+            return json.load(f)
+    except Exception:
+        log.debug(f"failed to parse {path}")
+        return None
+
+
+_LOADERS = {
+    ".toml": _try_load_toml,
+    ".yaml": _try_load_yaml,
+    ".yml": _try_load_yaml,
+    ".json": _try_load_json,
 }
 
-# Actions whose latest release tag doesn't follow semver.
-# Key = repo, value = ref to resolve (tag or branch).
-REF_OVERRIDES: dict[str, str] = {
-    "github/codeql-action": "v3",
-}
 
-REUSABLE_PATHS: set[str] = {
-    "slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml",
-}
+def _find_config_file() -> Path | None:
+    for d in _CONFIG_DIRS:
+        for name in _CONFIG_FILES:
+            p = d / name
+            if p.is_file():
+                return p
+    return None
 
+
+def _merge_config(defaults: dict, overrides: dict) -> dict:
+    """Shallow merge --- user values replace defaults per key."""
+    merged = dict(defaults)
+    merged.update(overrides)
+    return merged
+
+
+@dataclass
+class PinsConfig:
+    """Effective configuration for the action-pins script."""
+
+    branch_only_repos: dict[str, list[str]]
+    branch_overrides: dict[str, str]
+    ref_overrides: dict[str, str]
+    reusable_paths: list[str]
+    max_concurrent_api: int
+
+
+def load_config(path_hint: str | None = None) -> PinsConfig:
+    """Load config from *path_hint* or auto-detect, merged with defaults."""
+    raw = dict(_DEFAULT_CONFIG_RAW)
+    source: str | None = None
+
+    if path_hint:
+        p = Path(path_hint).resolve()
+        if not p.is_file():
+            log.warn(f"config file not found: {p}")
+        else:
+            loader = _LOADERS.get(p.suffix)
+            if loader:
+                overrides = loader(p)
+                if overrides is not None:
+                    raw = _merge_config(raw, overrides)
+                    source = str(p)
+    else:
+        p = _find_config_file()
+        if p is not None:
+            loader = _LOADERS.get(p.suffix)
+            if loader:
+                overrides = loader(p)
+                if overrides is not None:
+                    raw = _merge_config(raw, overrides)
+                    source = str(p)
+
+    cfg = PinsConfig(
+        branch_only_repos=raw["branch_only_repos"],
+        branch_overrides=raw["branch_overrides"],
+        ref_overrides=raw["ref_overrides"],
+        reusable_paths=raw["reusable_paths"],
+        max_concurrent_api=raw["max_concurrent_api"],
+    )
+
+    if source:
+        log.info(f"config: {source}")
+    else:
+        log.debug("no config file found, using defaults")
+
+    return cfg
+
+
+CFG: PinsConfig | None = None  # set in main() after arg parsing
+
+# ---------------------------------------------------------------------------
+# Data
+# ---------------------------------------------------------------------------
 
 @dataclass
 class ActionRef:
@@ -117,23 +278,39 @@ def parse_uses(line: str, file: Path, line_index: int) -> Optional[ActionRef]:
     return ActionRef(file, line_index, value, repo, path_suffix, "branch", ref)
 
 
-def collect_refs(root: Path) -> List[ActionRef]:
-    refs: List[ActionRef] = []
+async def collect_refs_async(root: Path) -> List[ActionRef]:
+    """Parallel scan of all workflow/action YAML files."""
+    files: List[Path] = []
     for dirpath in [root / ".github" / "workflows", root / ".github" / "actions"]:
         if not dirpath.is_dir():
             continue
         for f in sorted(dirpath.rglob("*.yml")):
-            if not f.is_file():
-                continue
-            for i, line in enumerate(f.read_text().splitlines()):
-                ar = parse_uses(line, f, i)
-                if ar is not None:
-                    refs.append(ar)
+            if f.is_file():
+                files.append(f)
+
+    if not files:
+        return []
+
+    log.debug(f"scanning {len(files)} YAML file(s)")
+
+    # Read all files concurrently via thread pool.
+    contents = await asyncio.gather(
+        *[asyncio.to_thread(f.read_text) for f in files],
+    )
+
+    refs: List[ActionRef] = []
+    for f, content in zip(files, contents):
+        for i, line in enumerate(content.splitlines()):
+            ar = parse_uses(line, f, i)
+            if ar is not None:
+                refs.append(ar)
+
+    log.debug(f"found {len(refs)} external action reference(s)")
     return refs
 
 
 # ---------------------------------------------------------------------------
-# GitHub API (authenticated)
+# GitHub API (async, authenticated, rate-limited)
 # ---------------------------------------------------------------------------
 
 GH_API = "https://api.github.com"
@@ -147,80 +324,95 @@ def _gh_headers() -> dict:
     return h
 
 
-def _gh_get(url: str) -> dict:
-    req = urllib.request.Request(url, headers=_gh_headers())
+# Global async cache for resolved SHAs.
+_sha_cache: Dict[str, str] = {}
+
+# Semaphore to limit concurrent API requests (lazy, created in main_async).
+_api_sem: asyncio.Semaphore | None = None
+
+
+async def _gh_get(client: httpx.AsyncClient, url: str) -> dict:
+    log.debug(f"GET {url}")
+    sem = _api_sem if _api_sem is not None else asyncio.Semaphore(CFG.max_concurrent_api)
     for attempt in range(3):
-        try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                remaining = resp.headers.get("X-RateLimit-Remaining", "?")
-                if remaining == "0":
-                    reset = int(resp.headers.get("X-RateLimit-Reset", "0"))
-                    wait = max(reset - time.time() + 5, 0)
-                    print(
-                        f"  rate limit exhausted, sleeping {wait:.0f}s...",
-                        file=sys.stderr,
-                    )
-                    time.sleep(wait)
+        async with sem:
+            try:
+                resp = await client.get(url, timeout=30)
+            except httpx.TimeoutException:
+                if attempt < 2:
+                    await asyncio.sleep(2**attempt)
                     continue
-                return json.loads(resp.read().decode())
-        except urllib.error.HTTPError as exc:
-            if exc.code == 403 and attempt < 2:
-                time.sleep(2 ** attempt)
+                raise RuntimeError(f"Timeout after retries: {url}")
+
+        # Check rate limit before error handling.
+        remaining = resp.headers.get("X-RateLimit-Remaining")
+        if remaining is not None and int(remaining) == 0:
+            reset = int(resp.headers.get("X-RateLimit-Reset", "0"))
+            wait = max(reset - time.time() + 2, 0)
+            log.warn(f"rate limit exhausted, sleeping {wait:.0f}s...")
+            await asyncio.sleep(wait)
+            continue
+
+        try:
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 403 and attempt < 2:
+                await asyncio.sleep(2**attempt)
                 continue
-            body = exc.read().decode()[:500]
-            raise RuntimeError(f"HTTP {exc.code}: {body}") from exc
-        except urllib.error.URLError as exc:
-            if attempt < 2:
-                time.sleep(2 ** attempt)
-                continue
-            raise RuntimeError(f"URL error: {exc}") from exc
+            body = exc.response.text[:500]
+            raise RuntimeError(f"HTTP {exc.response.status_code}: {body}") from exc
+
+        return resp.json()
+
     raise RuntimeError("max retries exceeded")
 
 
-# Simple in-memory cache for resolved SHAs.
-_sha_cache: Dict[str, str] = {}
-
-
-def resolve_tag_sha(repo: str, tag: str) -> str:
+async def resolve_tag_sha(client: httpx.AsyncClient, repo: str, tag: str) -> str:
     key = f"{repo}@tag:{tag}"
     if key in _sha_cache:
+        log.debug(f"cache hit: {key}")
         return _sha_cache[key]
-    ref_data = _gh_get(f"{GH_API}/repos/{repo}/git/ref/tags/{tag}")
+    log.debug(f"fetch tag ref: {repo} @ {tag}")
+    ref_data = await _gh_get(client, f"{GH_API}/repos/{repo}/git/ref/tags/{tag}")
     obj = ref_data["object"]
     if obj["type"] == "commit":
         _sha_cache[key] = obj["sha"]
         return obj["sha"]
-    tag_data = _gh_get(f"{GH_API}/repos/{repo}/git/tags/{obj['sha']}")
+    log.debug(f"tag points to annotated tag object, resolving...")
+    tag_data = await _gh_get(client, f"{GH_API}/repos/{repo}/git/tags/{obj['sha']}")
     _sha_cache[key] = tag_data["object"]["sha"]
     return tag_data["object"]["sha"]
 
 
-def resolve_branch_sha(repo: str, branch: str) -> str:
+async def resolve_branch_sha(client: httpx.AsyncClient, repo: str, branch: str) -> str:
     key = f"{repo}@branch:{branch}"
     if key in _sha_cache:
+        log.debug(f"cache hit: {key}")
         return _sha_cache[key]
-    ref_data = _gh_get(f"{GH_API}/repos/{repo}/git/ref/heads/{branch}")
+    log.debug(f"fetch branch ref: {repo} @ {branch}")
+    ref_data = await _gh_get(client, f"{GH_API}/repos/{repo}/git/ref/heads/{branch}")
     _sha_cache[key] = ref_data["object"]["sha"]
     return ref_data["object"]["sha"]
 
 
-def latest_release(repo: str) -> Tuple[str, str]:
+async def latest_release(client: httpx.AsyncClient, repo: str) -> Tuple[str, str]:
     """Return (tag_name, commit_sha) for the latest public release."""
     try:
-        release = _gh_get(f"{GH_API}/repos/{repo}/releases/latest")
+        release = await _gh_get(client, f"{GH_API}/repos/{repo}/releases/latest")
         tag = release["tag_name"]
     except RuntimeError:
-        releases = _gh_get(f"{GH_API}/repos/{repo}/releases?per_page=1")
+        releases = await _gh_get(client, f"{GH_API}/repos/{repo}/releases?per_page=1")
         if not releases:
-            raise RuntimeError(f"No releases found")
+            raise RuntimeError("No releases found")
         tag = releases[0]["tag_name"]
-    sha = resolve_tag_sha(repo, tag)
+    sha = await resolve_tag_sha(client, repo, tag)
     return tag, sha
 
 
 # ---------------------------------------------------------------------------
 # Per-ref logic
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class PinResult:
@@ -233,41 +425,41 @@ class PinResult:
 
 def _updated(ar: ActionRef, sha: str, tag: str) -> PinResult:
     return PinResult(
-        ar, "updated", new_sha=sha, tag=tag,
+        ar,
+        "updated",
+        new_sha=sha,
+        tag=tag,
         message=f"{tag} ({sha[:12]})",
     )
 
 
-def _resolve_tag(ar: ActionRef) -> Tuple[str, str]:
+async def _resolve_tag(client: httpx.AsyncClient, ar: ActionRef) -> Tuple[str, str]:
     """Return (display_tag, commit_sha) for *ar*'s repo at its current best ref."""
-    # Branch-only repo — display just the branch name (the repo is in the uses:).
-    if ar.repo in BRANCH_ONLY_REPOS:
-        for branch in BRANCH_ONLY_REPOS[ar.repo]:
-            sha = resolve_branch_sha(ar.repo, branch)
+    # Branch-only repo --- display just the branch name (the repo is in the uses:).
+    if ar.repo in CFG.branch_only_repos:
+        for branch in CFG.branch_only_repos[ar.repo]:
+            sha = await resolve_branch_sha(client, ar.repo, branch)
             if sha == ar.current_ref:
                 return branch, sha
         # No match -> default to first branch.
-        default = BRANCH_ONLY_REPOS[ar.repo][0]
-        sha = resolve_branch_sha(ar.repo, default)
+        default = CFG.branch_only_repos[ar.repo][0]
+        sha = await resolve_branch_sha(client, ar.repo, default)
         return default, sha
 
     # Override ref (e.g. codeql-action @v3).
-    if ar.repo in REF_OVERRIDES:
-        ref = REF_OVERRIDES[ar.repo]
-        sha = resolve_tag_sha(ar.repo, ref)
+    if ar.repo in CFG.ref_overrides:
+        ref = CFG.ref_overrides[ar.repo]
+        sha = await resolve_tag_sha(client, ar.repo, ref)
         return ref, sha
 
     # Normal versioned action.
-    tag, sha = latest_release(ar.repo)
+    tag, sha = await latest_release(client, ar.repo)
     return tag, sha
 
 
-
-
-
-def check_ref(ar: ActionRef) -> PinResult:
+async def check_ref(client: httpx.AsyncClient, ar: ActionRef) -> PinResult:
     try:
-        tag, sha = _resolve_tag(ar)
+        tag, sha = await _resolve_tag(client, ar)
 
         if ar.ref_type == "branch":
             if sha == ar.current_ref:
@@ -280,7 +472,8 @@ def check_ref(ar: ActionRef) -> PinResult:
             latest_major = _major_of(tag)
             if latest_major is not None and ar.major is not None and latest_major > ar.major:
                 return PinResult(
-                    ar, "major-bump",
+                    ar,
+                    "major-bump",
                     message=f"major bump: v{ar.major} -> v{latest_major} ({tag})",
                 )
             return _updated(ar, sha, tag)
@@ -292,7 +485,8 @@ def check_ref(ar: ActionRef) -> PinResult:
             latest_major = _major_of(tag)
             if latest_major is not None and latest_major > ar.major:
                 return PinResult(
-                    ar, "major-bump",
+                    ar,
+                    "major-bump",
                     message=f"major bump: v{ar.major} -> v{latest_major} ({tag})",
                 )
         return _updated(ar, sha, tag)
@@ -307,7 +501,7 @@ def _major_of(tag: str) -> Optional[int]:
 
 
 # ---------------------------------------------------------------------------
-# File rewriting
+# File rewriting (async via thread pool)
 # ---------------------------------------------------------------------------
 
 _RE_USES = re.compile(r'(uses:\s*["\']?[^"\'#\s]+)@([^\s"\'#]+)')
@@ -322,7 +516,7 @@ def _uses_line(prefix: str, sha: str, tag: Optional[str]) -> str:
     return line
 
 
-def apply_pin(file: Path, ar: ActionRef, new_sha: str, tag: Optional[str] = None) -> bool:
+def _apply_pin_sync(file: Path, ar: ActionRef, new_sha: str, tag: Optional[str] = None) -> bool:
     lines = file.read_text().splitlines()
     old_line = lines[ar.line_index]
     # Strip any existing trailing comment before rewriting.
@@ -339,7 +533,11 @@ def apply_pin(file: Path, ar: ActionRef, new_sha: str, tag: Optional[str] = None
     return True
 
 
-def fix_comment(file: Path, ar: ActionRef, tag: str) -> bool:
+async def apply_pin(file: Path, ar: ActionRef, new_sha: str, tag: Optional[str] = None) -> bool:
+    return await asyncio.to_thread(_apply_pin_sync, file, ar, new_sha, tag)
+
+
+def _fix_comment_sync(file: Path, ar: ActionRef, tag: str) -> bool:
     """Ensure the existing SHA-pinned line has the correct tag comment."""
     lines = file.read_text().splitlines()
     old_line = lines[ar.line_index]
@@ -357,9 +555,105 @@ def fix_comment(file: Path, ar: ActionRef, tag: str) -> bool:
     return True
 
 
+async def fix_comment(file: Path, ar: ActionRef, tag: str) -> bool:
+    return await asyncio.to_thread(_fix_comment_sync, file, ar, tag)
+
+
 # ---------------------------------------------------------------------------
-# Main
+# Main (async)
 # ---------------------------------------------------------------------------
+
+
+async def main_async(args: argparse.Namespace) -> int:
+    if not (os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")):
+        log.warn(
+            "no GITHUB_TOKEN / GH_TOKEN set --- unauthenticated API is "
+            "limited to 60 req/hr",
+        )
+
+    refs = await collect_refs_async(REPO_ROOT)
+    if not refs:
+        log.info("No external action references found.")
+        return 0
+
+    log.debug(
+        f"checking {len(refs)} reference(s) across "
+        f"{len({r.file for r in refs})} file(s)",
+    )
+
+    async with httpx.AsyncClient(headers=_gh_headers()) as client:
+        # Run all ref checks concurrently.
+        results: List[PinResult] = await asyncio.gather(
+            *[check_ref(client, ar) for ar in refs],
+        )
+
+    changed = 0
+    comments_fixed = 0
+    major_bumps = 0
+    errors = 0
+    for r in results:
+        tag_display = r.ref.display
+
+        if r.status == "uptodate":
+            log.info(f"  OK  {tag_display:50s}  {r.message}")
+            if args.write and r.tag:
+                if await fix_comment(r.ref.file, r.ref, r.tag):
+                    comments_fixed += 1
+                    log.info(
+                        f"       -> comment: {r.ref.file.name}:"
+                        f"{r.ref.line_index + 1}",
+                    )
+        elif r.status == "major-bump":
+            major_bumps += 1
+            note = " (use --apply-major)" if not args.apply_major else ""
+            log.info(f" MAJR {tag_display:50s}  {r.message}{note}")
+            if args.apply_major and r.new_sha:
+                if await apply_pin(r.ref.file, r.ref, r.new_sha, tag=r.tag):
+                    changed += 1
+                    log.info(
+                        f"       -> {r.ref.file.name}:{r.ref.line_index + 1}",
+                    )
+        elif r.status == "updated":
+            changed += 1
+            log.info(f"  UP  {tag_display:50s}  {r.message}")
+            if args.write and r.new_sha:
+                if await apply_pin(r.ref.file, r.ref, r.new_sha, tag=r.tag):
+                    changed += 1
+                    log.info(
+                        f"       -> {r.ref.file.name}:{r.ref.line_index + 1}",
+                    )
+        elif r.status == "error":
+            errors += 1
+            log.error(f" ERR  {tag_display:50s}  {r.message}")
+
+    if errors:
+        log.error(f"\n{errors} error(s)")
+
+    if not args.write and (changed or comments_fixed):
+        log.info(f"\n{changed} update(s) available. Run with --write to apply.")
+        return 1
+
+    if changed:
+        log.info(f"\n{changed} file(s) updated.")
+    if comments_fixed:
+        log.info(f"{comments_fixed} comment(s) fixed.")
+
+    if not changed and not comments_fixed and major_bumps and not args.apply_major:
+        log.info(
+            f"\n{major_bumps} major-bump(s) available. "
+            "Review manually or use --apply-major.",
+        )
+
+    return 0 if not errors else 1
+
+
+def _configure_logging(args: argparse.Namespace) -> None:
+    """Set log level based on ``--verbose`` / ``--quiet`` counts."""
+    level = _DEFAULT_LOG_LEVEL
+    level -= args.verbose * 10
+    level += args.quiet * 10
+    log.level = max(LOG_DEBUG, min(LOG_ERROR, level))
+
 
 def main() -> int:
     ap = argparse.ArgumentParser(
@@ -368,72 +662,52 @@ def main() -> int:
     )
     ap.add_argument("--write", action="store_true", help="write changes")
     ap.add_argument("--apply-major", action="store_true", help="apply major bumps")
+    ap.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="increase verbosity (repeat for debug)",
+    )
+    ap.add_argument(
+        "-q",
+        "--quiet",
+        action="count",
+        default=0,
+        help="decrease verbosity (repeat for errors only)",
+    )
+    ap.add_argument(
+        "--config",
+        type=str,
+        default=None,
+        help="path to config file (JSON / YAML / TOML)",
+    )
+    ap.add_argument(
+        "--print-config",
+        action="store_true",
+        help="print effective config and exit",
+    )
     args = ap.parse_args()
+    _configure_logging(args)
 
-    if not (os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")):
-        print(
-            "warning: no GITHUB_TOKEN / GH_TOKEN set — unauthenticated API is "
-            "limited to 60 req/hr",
-            file=sys.stderr,
+    global CFG
+    CFG = load_config(args.config)
+
+    if args.print_config:
+        import pprint  # noqa: PLC0415
+
+        pprint.pprint(
+            {
+                "branch_only_repos": CFG.branch_only_repos,
+                "branch_overrides": CFG.branch_overrides,
+                "ref_overrides": CFG.ref_overrides,
+                "reusable_paths": CFG.reusable_paths,
+                "max_concurrent_api": CFG.max_concurrent_api,
+            },
         )
-
-    refs = collect_refs(REPO_ROOT)
-    if not refs:
-        print("No external action references found.")
         return 0
 
-    results: List[PinResult] = []
-    for ar in refs:
-        results.append(check_ref(ar))
-
-    changed = 0
-    comments_fixed = 0
-    major_bumps = 0
-    errors = 0
-    for r in results:
-        tag = r.ref.display
-
-        if r.status == "uptodate":
-            print(f"  OK  {tag:50s}  {r.message}")
-            if args.write and r.tag:
-                if fix_comment(r.ref.file, r.ref, r.tag):
-                    comments_fixed += 1
-                    print(f"       -> comment: {r.ref.file.name}:{r.ref.line_index + 1}")
-        elif r.status == "major-bump":
-            major_bumps += 1
-            note = " (use --apply-major)" if not args.apply_major else ""
-            print(f" MAJR {tag:50s}  {r.message}{note}")
-            if args.apply_major and r.new_sha:
-                if apply_pin(r.ref.file, r.ref, r.new_sha, tag=r.tag):
-                    changed += 1
-                    print(f"       -> {r.ref.file.name}:{r.ref.line_index + 1}")
-        elif r.status == "updated":
-            changed += 1
-            print(f"  UP  {tag:50s}  {r.message}")
-            if args.write and r.new_sha:
-                if apply_pin(r.ref.file, r.ref, r.new_sha, tag=r.tag):
-                    changed += 1
-                    print(f"       -> {r.ref.file.name}:{r.ref.line_index + 1}")
-        elif r.status == "error":
-            errors += 1
-            print(f" ERR  {tag:50s}  {r.message}", file=sys.stderr)
-
-    if errors:
-        print(f"\n{errors} error(s)", file=sys.stderr)
-
-    if not args.write and (changed or comments_fixed):
-        print(f"\n{changed} update(s) available. Run with --write to apply.")
-        return 1
-
-    if changed:
-        print(f"\n{changed} file(s) updated.")
-    if comments_fixed:
-        print(f"{comments_fixed} comment(s) fixed.")
-
-    if not changed and not comments_fixed and major_bumps and not args.apply_major:
-        print(f"\n{major_bumps} major-bump(s) available. Review manually or use --apply-major.")
-
-    return 0 if not errors else 1
+    return asyncio.run(main_async(args))
 
 
 if __name__ == "__main__":

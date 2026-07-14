@@ -1,12 +1,11 @@
 name: Scorecard
 
+concurrency:
+  group: scorecard-${{ github.ref_name }}
+  cancel-in-progress: ${{ github.ref_name != github.event.repository.default_branch }}
+
 on:
   branch_protection_rule:
-  # schedule:
-  #   - cron: "0 6 * * 1"
-  # push:
-  #   branches: [main]
-
   workflow_dispatch:
 
 # Top-level read-all; jobs that upload results need additional write permissions.
@@ -15,21 +14,27 @@ permissions: read-all
 jobs:
   analysis:
     name: Scorecard analysis
-    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     permissions:
+      # Required when publishing results (badge / API / code scanning)
       security-events: write
       id-token: write
+      # Recommended reads for private repos to avoid GraphQL/SAST gaps
+      contents: read
+      issues: read
+      pull-requests: read
+      checks: read
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           persist-credentials: false
 
-      - uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a  # v2.4.3
+      - uses: ./.github/actions/scorecard-action
         with:
           results_file: results.sarif
           results_format: sarif
           publish_results: true
 
-      - uses: github/codeql-action/upload-sarif@02c5e83432fe5497fd85b873b6c9f16a8578e1d9  # v3
+      - uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9  # v4
         with:
           sarif_file: results.sarif

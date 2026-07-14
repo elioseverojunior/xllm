@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 XLLM contributors
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 pub use xllm_bitnet as bitnet;
 pub use xllm_context as context;
 pub use xllm_ggml as ggml;
@@ -12,14 +15,15 @@ pub use xllm_train as train;
 mod tests {
     #[test]
     fn re_exports_compile() {
-        let _ = crate::tensor::Tensor;
-        let _ = crate::ggml::Graph;
-        let _ = crate::model::Model;
-        let _ = crate::tokenizer::Tokenizer;
-        let _ = crate::sampling::Sampler;
-        let _ = crate::context::InferenceContext;
-        let _ = crate::quantize::Quantizer;
-        let _ = crate::bitnet::BitNetKernel;
-        let _ = crate::train::Trainer;
+        use core::mem::size_of;
+        let _ = size_of::<crate::tensor::Tensor>();
+        let _ = size_of::<crate::ggml::Graph>();
+        let _ = size_of::<crate::model::Model>();
+        let _ = size_of::<crate::tokenizer::Tokenizer>();
+        let _ = size_of::<crate::sampling::Sampler>();
+        let _ = size_of::<crate::context::InferenceContext>();
+        let _ = size_of::<crate::quantize::Quantizer>();
+        let _ = size_of::<crate::bitnet::BitNetKernel>();
+        let _ = size_of::<crate::train::Trainer>();
     }
 }

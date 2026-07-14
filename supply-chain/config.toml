@@ -20,49 +20,49 @@ url = "https://raw.githubusercontent.com/mozilla/supply-chain/main/audits.toml"
 url = "https://raw.githubusercontent.com/zcash/rust-ecosystem/main/supply-chain/audits.toml"
 
 [[exemptions.crossbeam-deque]]
-version = "0.8.7"
 criteria = "safe-to-deploy"
+version = "0.8.7"
 
 [[exemptions.crossbeam-epoch]]
-version = "0.9.20"
 criteria = "safe-to-deploy"
+version = "0.9.20"
 
 [[exemptions.crossbeam-utils]]
-version = "0.8.22"
 criteria = "safe-to-deploy"
+version = "0.8.22"
 
 [[exemptions.half]]
-version = "2.7.1"
 criteria = "safe-to-deploy"
+version = "2.7.1"
 
 [[exemptions.libc]]
-version = "0.2.186"
 criteria = "safe-to-deploy"
+version = "0.2.186"
 
 [[exemptions.memmap2]]
-version = "0.9.11"
 criteria = "safe-to-deploy"
+version = "0.9.11"
 
 [[exemptions.quote]]
-version = "1.0.46"
 criteria = "safe-to-deploy"
+version = "1.0.46"
 
 [[exemptions.rayon]]
-version = "1.12.0"
 criteria = "safe-to-deploy"
+version = "1.12.0"
 
 [[exemptions.syn]]
-version = "2.0.118"
 criteria = "safe-to-deploy"
+version = "2.0.118"
 
 [[exemptions.unicode-ident]]
-version = "1.0.24"
 criteria = "safe-to-deploy"
+version = "1.0.24"
 
 [[exemptions.zerocopy]]
-version = "0.8.54"
 criteria = "safe-to-deploy"
+version = "0.8.54"
 
 [[exemptions.zerocopy-derive]]
-version = "0.8.54"
 criteria = "safe-to-deploy"
+version = "0.8.54"

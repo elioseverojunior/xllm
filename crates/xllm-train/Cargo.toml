@@ -1,12 +1,19 @@
 [package]
+authors.workspace = true
+categories = ["science"]
 description = "Training and fine-tuning support for xllm models"
+documentation.workspace = true
 edition.workspace = true
+keywords = ["training", "fine-tuning", "learning", "optimizer", "backprop"]
 license.workspace = true
 name = "xllm-train"
+readme = "README.md"
+repository.workspace = true
+rust-version.workspace = true
 version.workspace = true
 
-[lints]
-workspace = true
+[package.metadata.cargo-machete]
+ignored = ["xllm-context", "xllm-ggml", "xllm-model", "xllm-tensor"]
 
 [dependencies]
 xllm-context.workspace = true
@@ -14,5 +21,5 @@ xllm-ggml.workspace = true
 xllm-model.workspace = true
 xllm-tensor.workspace = true
 
-[package.metadata.cargo-machete]
-ignored = ["xllm-context", "xllm-ggml", "xllm-model", "xllm-tensor"]
+[lints]
+workspace = true

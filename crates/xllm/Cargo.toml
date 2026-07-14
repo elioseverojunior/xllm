@@ -1,20 +1,27 @@
 [package]
+authors.workspace = true
+categories = ["science"]
 description = "CPU-first LLM inference engine - Rust port of llama.cpp"
+documentation.workspace = true
 edition.workspace = true
+keywords = ["llm", "inference", "machine-learning", "transformer", "llama"]
 license.workspace = true
 name = "xllm"
+readme = "README.md"
+repository.workspace = true
+rust-version.workspace = true
 version.workspace = true
+
+[dependencies]
+xllm-bitnet = { workspace = true, features = [] }
+xllm-context = { workspace = true, features = [] }
+xllm-ggml = { workspace = true, features = [] }
+xllm-model = { workspace = true, features = [] }
+xllm-quantize = { workspace = true, features = [] }
+xllm-sampling = { workspace = true, features = [] }
+xllm-tensor = { workspace = true, features = [] }
+xllm-tokenizer = { workspace = true, features = [] }
+xllm-train = { workspace = true, features = [] }
 
 [lints]
 workspace = true
-
-[dependencies]
-xllm-bitnet.workspace = true
-xllm-context.workspace = true
-xllm-ggml.workspace = true
-xllm-model.workspace = true
-xllm-quantize.workspace = true
-xllm-sampling.workspace = true
-xllm-tensor.workspace = true
-xllm-tokenizer.workspace = true
-xllm-train.workspace = true

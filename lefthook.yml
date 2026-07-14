@@ -70,7 +70,7 @@ pre-commit:
     - name: markdownlint
       # Markdown lint using GitHub's ruleset (@github/markdownlint-github):
       # accessibility rules GH001-003 plus markdownlint defaults, with project
-      # overrides in .markdownlint-cli2.mjs. Auto-fixes blank-line rules
+      # overrides in .rumdl.toml. Auto-fixes blank-line rules
       # (MD022/MD032) and re-stages; unfixable findings block. This replaces the
       # legacy pre-commit markdown-format-check (`make check-markdown`, no Makefile).
       glob: "*.md"

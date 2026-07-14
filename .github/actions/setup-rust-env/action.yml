@@ -1,0 +1,94 @@
+name: "Setup Rust Environment"
+description: "Setup Rust toolchain, cache, and cargo tools in one action"
+inputs:
+  toolchain:
+    description: "Rust toolchain version (channel or rust-toolchain.toml)"
+    required: false
+    default: "stable"
+  components:
+    description: "Additional rustup components (e.g., clippy, rustfmt, miri)"
+    required: false
+    default: ""
+  targets:
+    description: "Additional rustup targets (e.g., wasm32-unknown-unknown)"
+    required: false
+    default: ""
+  cargo-tools:
+    description: "Space-separated list of cargo tools to install"
+    required: false
+    default: >
+      cargo-audit cargo-crap cargo-criterion cargo-deny cargo-edit cargo-fuzz
+      cargo-machete cargo-mutants cargo-nextest cargo-pgo cargo-semver-checks
+      cargo-sort cargo-tarpaulin cargo-wizard committed flamegraph
+      rumdl taplo-cli
+  cache-key-suffix:
+    description: "Additional suffix for cache key specificity"
+    required: false
+    default: ""
+  cache-target:
+    description: "Whether to cache target directory"
+    required: false
+    default: "true"
+  rust-cache-shared-key:
+    description: "Shared key for rust-cache (e.g., 'perf' for benchmarks)"
+    required: false
+    default: ""
+  rust-cache-save-if:
+    description: "Condition for rust-cache to save (e.g., github.ref == 'refs/heads/main')"
+    required: false
+    default: ""
+
+outputs:
+  cache-hit:
+    description: "Whether the Rust cache was restored (exact match)"
+    value: ${{ steps.rust-cache.outputs.cache-hit }}
+  cache-key:
+    description: "The computed cache key passed to Swatinem/rust-cache"
+    value: ${{ steps.cache-names.outputs.cache-key }}
+  cache-shared-key:
+    description: "The computed shared key passed to Swatinem/rust-cache"
+    value: ${{ steps.cache-names.outputs.cache-shared-key }}
+  rust-version:
+    description: "The installed Rust toolchain version (e.g. 'rustc 1.88.0 (a1b2c3d4e 2025-07-14)')"
+    value: ${{ steps.rust-version.outputs.version }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Rust toolchain
+      id: rust-toolchain
+      uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30  # stable
+      with:
+        toolchain: ${{ inputs.toolchain }}
+        components: ${{ inputs.components }}
+        targets: ${{ inputs.targets }}
+
+    - name: Get Rust version
+      id: rust-version
+      shell: bash
+      run: echo "version=$(rustc --version)" >> "$GITHUB_OUTPUT"
+
+    - name: Compute cache key
+      id: cache-names
+      shell: bash
+      run: |
+        cache_key="cargo-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache-key-suffix }}-${{ hashFiles('**/Cargo.lock') }}"
+        echo "cache-key=${cache_key}" >> "$GITHUB_OUTPUT"
+        shared_key="${{ inputs.rust-cache-shared-key || inputs.toolchain }}"
+        echo "cache-shared-key=${shared_key}" >> "$GITHUB_OUTPUT"
+
+    - name: Setup Rust cache
+      id: rust-cache
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
+      with:
+        cache-on-failure: true
+        save-if: ${{ inputs.cache-target == 'true' && inputs.rust-cache-save-if != '' && inputs.rust-cache-save-if }}
+        shared-key: ${{ inputs.rust-cache-shared-key || inputs.toolchain }}
+        key: cargo-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache-key-suffix }}-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Install cargo tools
+      if: ${{ inputs.cargo-tools != '' }}
+      uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853  # v2.83.2
+      with:
+        tool: |
+          ${{ inputs.cargo-tools }}

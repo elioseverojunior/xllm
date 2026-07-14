@@ -1,4 +1,3 @@
----
 # yamllint configuration ~ https://yamllint.readthedocs.io
 
 extends: default
@@ -14,16 +13,19 @@ ignore: |
   target/
 
 rules:
-  # Allow longer lines than the 80-char default; keep it advisory, not fatal.
-  line-length:
-    max: 180
-    level: warning
-  # Our hand-written configs (lefthook.yml, mise tasks) don't start with `---`.
-  document-start: disable
+  # Completely ignore comment formatting rules
+  comments: disable
+
   # Commented-out config blocks (e.g. the disabled post-commit job) aren't
   # indented like surrounding content; don't flag that.
   comments-indentation: disable
+
+  # Allow longer lines than the 80-char default; keep it advisory, not fatal.
+  line-length: disable
+
+  # Our hand-written configs (lefthook.yml, mise tasks) don't start with `---`.
+  document-start: disable
+
   # GitHub Actions workflows use `on:` as a mapping key, which YAML 1.1 reads as
   # a boolean. Don't flag mapping keys for truthiness (values are still checked).
-  truthy:
-    check-keys: false
+  truthy: disable

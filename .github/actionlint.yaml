@@ -24,6 +24,7 @@ self-hosted-runner:
 # introduced. Set to `null` to disable the check entirely.
 config-variables:
   - RUNS_ON
+  - RUST_COVERAGE_TRESHOLD
 
 # Path-specific configurations.
 paths:

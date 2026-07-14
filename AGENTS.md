@@ -10,10 +10,10 @@
 
 ## Toolchain
 
-- **Nightly Rust** pinned via `rust-toolchain.toml`.
+- **Stable Rust** pinned via `rust-toolchain.toml`.
 - Warnings-as-errors enforced via `[workspace.lints]` in root `Cargo.toml` + `.cargo/config.toml`.
-- `rustfmt.toml` configures import grouping: std → external crates → local (`crate::`, `super::`).
-- `.markdownlint.jsonc` controls markdown formatting (MD022, MD031, MD032 enforced).
+- `rustfmt.toml` configures import reordering: std → external crates → local.
+- `.rumdl.toml` controls markdown formatting.
 
 ## Workflow
 
@@ -31,11 +31,11 @@
   cargo machete                 # detect unused dependencies
   cargo miri test               # undefined behavior detection
   taplo format --check Cargo.toml crates/*/Cargo.toml  # TOML formatting check
-  pnpm lint:md                  # markdown lint
-  pnpm fix:md                   # auto-fix markdown issues
+  mise run markdownlint         # markdown lint
+  mise run markdownlint:fix     # auto-fix markdown issues
   ```
 
-- Order: `cargo sort` → `taplo format Cargo.toml crates/*/Cargo.toml` → `pnpm fix:md` →
+- Order: `cargo sort` → `taplo format Cargo.toml crates/*/Cargo.toml` → `mise run markdownlint:fix` →
   `cargo fmt` → `cargo clippy -- -D warnings` → `cargo audit --deny warnings` →
   `cargo deny check` → `cargo vet` → `cargo machete` → `cargo nextest run`.
 - Plan file `docs/plan/XLLM_PLAN.md` must be consulted/updated for architecture decisions.
@@ -68,13 +68,35 @@
 - Principles: TDD, KISS, DRY, YAGNI, TDA, SOLID.
 - No comments unless explaining a non-obvious invariant.
 
+## Session context (Jul 14, 2026)
+
+### What was done
+
+- **Download subcommand**: Added `xllm-cli download` to fetch GGUF models from HuggingFace Hub using reqwest.
+- **Model caching**: Models saved to `~/.cache/huggingface/hub/` following HF conventions.
+- **Smart file listing**: Auto-detects .gguf files via HF API (`/api/models/{repo}/tree/main`), picks first alphabetically.
+- **Verified with real model**: Successfully downloaded `tinyllama-1.1b-chat-v1.0.Q2_K.gguf` (483MB) from `TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF`.
+- **Clippy clean**: Fixed all warnings (collapsible if, unwrap_or_default, unused variable prefix with `_`).
+- **opencode.json**: Updated permissions to `"ask"` for general bash, allowlisted cargo/pnpm/rustup/mise/mkdir/rm, specific git commands, denied git commit/push and gh actions.
+
+### Known limitations
+
+- Tensor type 14 (Q2_K) in GGUF not yet supported by `xllm-model` — need to extend tensor type enum.
+- Sha256 verification skipped (would need HF API calls + auth).
+- `--no-symlinks` flag accepted but not yet wired to logic.
+
+### URLs
+
+- HF model download: `https://huggingface.co/{repo}/resolve/main/{filename}`
+- HF file list API: `https://huggingface.co/api/models/{repo}/tree/main`
+
 ## Key files
 
 | File | Purpose |
 | --- | --- |
-| `rust-toolchain.toml` | Pinned nightly channel |
+| `rust-toolchain.toml` | Pinned stable channel |
 | `.cargo/config.toml` | Build/linker tuning, profile optimization |
-| `rustfmt.toml` | Import grouping: std, external, local last |
+| `rustfmt.toml` | Import reorder: std, external, local last |
 | `deny.toml` | License/bans/sources policy (cargo-deny) |
 | `.cargo/audit.toml` | Advisory severity thresholds |
 | `supply-chain/` | cargo-vet supply chain audits |
@@ -91,7 +113,7 @@
 | `crates/xllm-quantize/Cargo.toml` | Quantization crate |
 | `crates/xllm-bitnet/Cargo.toml` | BitNet kernels crate |
 | `crates/xllm-train/Cargo.toml` | Training crate |
-| `instructions.md` | Owner's vision: CPU-first, GPU later, nightly, security, TDD |
+| `instructions.md` | Owner's vision: CPU-first, GPU later, security, TDD |
 | `docs/guidelines/contribution.md` | AI agent rules — read before committing/pushing/PRing |
 | `docs/plan/XLLM_PLAN.md` | Architecture plan |
 

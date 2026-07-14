@@ -1,41 +1,95 @@
 [workspace]
-members = [
-    "crates/xllm",
-    "crates/xllm-bitnet",
-    "crates/xllm-cli",
-    "crates/xllm-context",
-    "crates/xllm-ggml",
-    "crates/xllm-model",
-    "crates/xllm-quantize",
-    "crates/xllm-sampling",
-    "crates/xllm-tensor",
-    "crates/xllm-tokenizer",
-    "crates/xllm-train",
-]
-resolver = "2"
+exclude = []
+members = ["crates/*"]
+resolver = "3"
 
 [workspace.package]
+authors = ["Elio Severo Junior <elioseverojunior@gmail.com>"]
+categories = []
+description = ""
+documentation = "https://docs.rs/xllm"
 edition = "2024"
+keywords = []
 license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/elioseverojunior/xllm"
+rust-version = "1.92"
 version = "0.1.0"
 
 [workspace.lints.rust]
+rust_2018_idioms = { level = "warn", priority = -1 }
 unexpected_cfgs = "deny"
+unnameable_types = "warn"
+unreachable_pub = "warn"
 unsafe_code = "deny"
+unused_lifetimes = "warn"
+unused_macro_rules = "warn"
+unused_qualifications = "warn"
 warnings = "deny"
 
+[workspace.lints.clippy]
+# Lint GROUPS this workspace opts into (all default to `allow`; we raise them to
+# `warn`). priority = -1 so the per-lint overrides further down win over the
+# groups (clippy requires group priority < lint priority for the override to
+# apply). NOTE on "warn" vs "deny": the warnings-as-errors policy lives in ONE
+# place — `-D warnings` in .cargo/config.toml — which escalates EVERY warning
+# (rustc + clippy, local + CI) into a hard error. So "warn" here already means
+# "deny in practice"; writing "deny" per-group would scatter that single policy.
+#   * pedantic — stricter, opinionated correctness/clarity lints.
+#   * nursery  — newer lints still being refined (may evolve); enabled per request.
+#   * cargo    — Cargo.toml hygiene: wildcard/`*` deps, missing metadata, feature names.
+cargo = { level = "warn", priority = -1 }
+collapsible_if = "allow"
+nursery = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+
+# --- per-lint opt-ins (individual `restriction`-group lints) -----------------
+# The `restriction` group as a whole is too opinionated (many mutually exclusive
+# lints) to enable, so we opt in to just the two that the project's .clippy.toml
+# already tunes: production code must not `.unwrap()`/`.expect()` (a panic is a
+# DoS per CLAUDE.md), while `allow-unwrap-in-tests`/`allow-expect-in-tests` in
+# .clippy.toml keep them ergonomic inside `#[cfg(test)]`.
+expect_used = "warn"
+unwrap_used = "warn"
+
+# --- per-lint opt-outs (default priority 0, so they outrank the groups above) ---
+# Duplicate *transitive* dependency versions are pulled in by upstream crates and
+# are outside this project's control; the rest of `cargo` stays a hard gate.
+multiple_crate_versions = "allow"
+# Package metadata (repository, keywords, categories) is missing from many
+# workspace crates; enable metadata on a per-crate basis.
+cargo_common_metadata = "allow"
+
+# `redundant_pub_crate` (nursery) directly CONTRADICTS the stable rustc
+# `unreachable_pub` lint in [workspace.lints.rust]: the former wants `pub` on a
+# `pub(crate)` item inside a private module, the latter wants `pub(crate)` on a
+# `pub` item that isn't externally reachable. They can't both be satisfied, so the
+# nursery lint yields to the stable one — `pub(crate)` is the correct visibility.
+redundant_pub_crate = "allow"
+
 [workspace.dependencies]
+### Crates Dependencies
 byteorder = "1"
-half = "2"
-memmap2 = "0.9"
-rayon = "1"
+clap = { version = ">=4,<5.0.0", features = ["derive"] }
+dirs = { version = ">=6,<7.0.0" }
+fastrand = { version = ">=2,<3.0.0" }
+half = { version = ">=2,<3.0.0" }
+memmap2 = { version = ">=0,<1.0.0" }
+num-traits = { version = ">=0,<1" }
+rayon = { version = ">=1,<2.0.0" }
+reqwest = { version = ">=0,<1.0.0", features = ["json", "__tls"] }
+serde = { version = ">=1,<2.0.0", features = ["derive"] }
+serde_json = { version = ">=1,<2.0.0" }
+thiserror = { version = ">=2,<3.0.0" }
+tokio = { version = ">=1,<2.0.0", features = ["full"] }
+### Workspaced Crates
 xllm = { path = "crates/xllm" }
-xllm-bitnet = { path = "crates/xllm-bitnet" }
-xllm-context = { path = "crates/xllm-context" }
-xllm-ggml = { path = "crates/xllm-ggml" }
-xllm-model = { path = "crates/xllm-model" }
-xllm-quantize = { path = "crates/xllm-quantize" }
-xllm-sampling = { path = "crates/xllm-sampling" }
-xllm-tensor = { path = "crates/xllm-tensor" }
-xllm-tokenizer = { path = "crates/xllm-tokenizer" }
-xllm-train = { path = "crates/xllm-train" }
+xllm-bitnet = { path = "crates/xllm-bitnet", version = "0.1.0" }
+xllm-context = { path = "crates/xllm-context", version = "0.1.0" }
+xllm-ggml = { path = "crates/xllm-ggml", version = "0.1.0" }
+xllm-model = { path = "crates/xllm-model", version = "0.1.0" }
+xllm-quantize = { path = "crates/xllm-quantize", version = "0.1.0" }
+xllm-sampling = { path = "crates/xllm-sampling", version = "0.1.0" }
+xllm-tensor = { path = "crates/xllm-tensor", version = "0.1.0" }
+xllm-tokenizer = { path = "crates/xllm-tokenizer", version = "0.1.0" }
+xllm-train = { path = "crates/xllm-train", version = "0.1.0" }

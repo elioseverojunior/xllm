@@ -1,17 +1,25 @@
 [package]
+authors.workspace = true
+categories = ["algorithms"]
 description = "Inference context with KV cache management for transformer models"
+documentation.workspace = true
 edition.workspace = true
+keywords = ["kv-cache", "attention", "transformer", "inference", "context"]
 license.workspace = true
 name = "xllm-context"
+readme = "README.md"
+repository.workspace = true
+rust-version.workspace = true
 version.workspace = true
 
-[lints]
-workspace = true
+[package.metadata.cargo-machete]
+ignored = ["xllm-ggml", "xllm-model", "xllm-tensor"]
 
 [dependencies]
+thiserror.workspace = true
 xllm-ggml.workspace = true
 xllm-model.workspace = true
 xllm-tensor.workspace = true
 
-[package.metadata.cargo-machete]
-ignored = ["xllm-ggml", "xllm-model", "xllm-tensor"]
+[lints]
+workspace = true

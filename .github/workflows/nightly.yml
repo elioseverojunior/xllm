@@ -1,5 +1,9 @@
 name: Nightly Fuzz & Bench
 
+concurrency:
+  group: nightly-fuz-bench-${{ github.ref_name }}
+  cancel-in-progress: ${{ github.ref_name != github.event.repository.default_branch }}
+
 on:
   schedule:
     - cron: "0 4 * * *"
@@ -66,9 +70,11 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30  # stable
-
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
+      - uses: ./.github/actions/setup-rust-env
+        with:
+          toolchain: "nightly"
+          rust-cache-shared-key: nightly
+          rust-cache-save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Check for benchmarks
         id: has-benches

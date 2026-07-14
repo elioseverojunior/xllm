@@ -8,59 +8,62 @@
 # tools (git-cliff, lefthook, etc.) are pinned explicitly in [tools] below.
 
 [settings]
-# Let mise read the Rust version/components from rust-toolchain.toml and the
-# Node version from package.json's `devEngines.runtime` — each tool's version
-# lives in its own canonical file, so there is a single source of truth and no
-# drift (idiomatic version files are opt-in, hence this allow-list).
-idiomatic_version_file_enable_tools = ["rust", "node"]
+color = true
+experimental = true
+idiomatic_version_file_enable_tools = []
+
+[env]
+ARCH = "{{exec(command='uname -m')}}"
+RUST_COVERAGE_THRESHOLD = "80"
 
 [tools]
 # rust is provisioned from rust-toolchain.toml via [settings] above — no version
 # is repeated here, keeping rust-toolchain.toml the single source of truth.
-"cargo:cargo-audit" = "0.22.2"
-"cargo:cargo-criterion" = "1.1.0"
-"cargo:cargo-deny" = "0.20.2"
-"cargo:cargo-fuzz" = "0.13.2"
-"cargo:cargo-machete" = "0.9.2"
-"cargo:cargo-mutants" = "27.1.0"
-"cargo:cargo-nextest" = "0.9.140"
-"cargo:cargo-pgo" = "0.3.0"
-"cargo:cargo-semver-checks" = "0.48.0"
-"cargo:cargo-sort" = "2.1.4"
-"cargo:cargo-tarpaulin" = "0.37.0"
-"cargo:cargo-wizard" = "0.2.3"
-"cargo:committed" = "1.1.11"
-"cargo:flamegraph" = "0.6.13"
+"cargo:cargo-audit" = "latest"
+"cargo:cargo-crap" = "latest"
+"cargo:cargo-criterion" = "latest"
+"cargo:cargo-deny" = "latest"
+"cargo:cargo-edit" = "latest"
+"cargo:cargo-fuzz" = "latest"
+"cargo:cargo-machete" = "latest"
+"cargo:cargo-mutants" = "latest"
+"cargo:cargo-nextest" = "latest"
+"cargo:cargo-pgo" = "latest"
+"cargo:cargo-semver-checks" = "latest"
+"cargo:cargo-sort" = "latest"
+"cargo:cargo-tarpaulin" = "latest"
+"cargo:cargo-wizard" = "latest"
+"cargo:committed" = "latest"
+"cargo:flamegraph" = "latest"
+"cargo:hk" = "latest"
+"cargo:rumdl" = "latest"
+"cargo:taplo-cli" = "latest"
 # node is provisioned from package.json's `devEngines.runtime` via [settings]
 # above — no version is repeated here, keeping package.json the single source
 # of truth for the Node version (mirrors the rust / rust-toolchain.toml setup).
-actionlint = "1.7.12"
-git-cliff = "2.13.1"
-gitleaks = "8.30.1"
-lefthook = "2.1.10"
+actionlint = "latest"
+git-cliff = "latest"
+gitleaks = "latest"
+lefthook = "latest"
+
 # taplo: general-purpose TOML formatter + linter (aqua ships a prebuilt binary).
 # Pairs with cargo-sort — taplo owns TOML *formatting*, cargo-sort owns Cargo.toml
 # dependency *ordering* (taplo deliberately does not reorder keys).
-taplo = "0.10.0"
+taplo = "latest"
 # Package manager for the dev-only Markdown lint toolchain. Pinned here (not in
 # package.json's `packageManager`) to keep one version in one place. Installed
 # via the npm backend rather than the default aqua backend, because aqua ships
 # no darwin/amd64 (Intel macOS) pnpm build; the npm backend is platform-neutral
 # and runs under the pinned node (pnpm 11 needs node >= 24).
-"npm:pnpm" = "11.12.0"
-"pipx:codecov-cli" = "11.3.1"
-"pipx:reuse" = "6.2.0"
-"pipx:yamllint" = "1.38.0"
+"pipx:codecov-cli" = "latest"
+"pipx:reuse" = "latest"
+"pipx:yamllint" = "latest"
 
 [tasks.setup]
 description = "Bootstrap the project: install the Rust toolchain + tools and wire git hooks (idempotent). On a fresh clone run `mise trust` first."
 # Order matters: `mise install` provisions the lefthook binary that the second
 # step needs. Both steps are idempotent, so this is safe to re-run any time.
-run = [
-  "mise install",
-  "mise run hooks-install",
-  "pnpm install --frozen-lockfile",
-]
+run = ["mise install", "mise run hooks-install"]
 
 [tasks.hooks-install]
 description = "Install the git hooks managed by lefthook"
@@ -159,29 +162,28 @@ usage = 'arg "[paths]" var=#true help="workflow files to lint; defaults to every
 
 [tasks.markdownlint]
 alias = "md"
-description = "Lint Markdown with markdownlint-cli2 using GitHub's ruleset (@github/markdownlint-github); config in .markdownlint-cli2.mjs. Needs `mise run setup` (pnpm install) first"
+description = "Lint Markdown with rumdl using config in .rumdl.toml"
 run = '''
 #!/usr/bin/env bash
 
 set -eou pipefail
 
-# Empty array -> no positional args -> markdownlint-cli2 uses the config globs.
 eval "paths=(${usage_paths:-})"
-pnpm exec markdownlint-cli2 "${paths[@]}"
+rumdl check "${paths[@]}"
 '''
 shell = "bash -c"
 usage = 'arg "[paths]" var=#true help="paths/globs to lint; uses the config globs when omitted"'
 
 [tasks."markdownlint:fix"]
 alias = "mdf"
-description = "Auto-fix Markdown issues (blank lines around headings/lists, etc.) with markdownlint-cli2 --fix; GH001-003 accessibility findings still require manual fixes"
+description = "Auto-fix Markdown issues (blank lines around headings/lists, etc.) with rumdl --fix"
 run = '''
 #!/usr/bin/env bash
 
 set -eou pipefail
 
 eval "paths=(${usage_paths:-})"
-pnpm exec markdownlint-cli2 --fix "${paths[@]}"
+rumdl fmt "${paths[@]}"
 '''
 shell = "bash -c"
 usage = 'arg "[paths]" var=#true help="paths/globs to fix; uses the config globs when omitted"'
@@ -189,7 +191,7 @@ usage = 'arg "[paths]" var=#true help="paths/globs to fix; uses the config globs
 [tasks.cargo-sort]
 alias = "sort"
 description = "Sort [dependencies] tables in every Cargo.toml alphabetically with cargo-sort (writes). Run BEFORE taplo so taplo gets the final formatting pass"
-run = "cargo sort --workspace --config tomlfmt.toml"
+run = "cargo sort --workspace"
 
 [tasks."cargo-sort:check"]
 alias = "sortc"
@@ -350,14 +352,106 @@ cargo deny "${args[@]}"
 shell = "bash -c"
 usage = 'arg "[args]" var=#true help="cargo-deny args; defaults to `check` (all checks) when omitted"'
 
-[tasks.coverage]
-alias = "cov"
-depends = ["submodule"]
+[tasks."coverage:sarif"]
+alias = ["cov:sarif", "sarif"]
+depends = ["llvm-cov"]
+depends_post = []
 description = "Measure production-code coverage with cargo-tarpaulin. All options (engine, outputs, ignores) live in tarpaulin.toml — the single source of truth — so this is a bare invocation."
-run = "cargo tarpaulin"
+run = '''
+#!/usr/bin/env bash
+
+set -eou pipefail
+
+cargo crap --lcov lcov.info --format sarif > results.sarif
+'''
+shell = "bash -c"
+
+[tasks.llvm-cov]
+alias = ["lcov"]
+depends = []
+depends_post = []
+description = "Measure workspace coverage with cargo-llvm-cov, score with cargo-crap, then gate CI on the CRAP threshold."
+run = '''
+#!/usr/bin/env bash
+
+set -eou pipefail
+
+cargo llvm-cov --workspace --lcov --output-path lcov.info
+
+# 2. Score every function (excluding CLI — binary, integration-tested).
+cargo crap --workspace --lcov lcov.info \
+  --allow '**/xllm-cli/**' \
+  --allow 'Model::parse_value'
+
+# 3. Gate CI on the threshold.
+cargo crap --workspace --lcov lcov.info \
+  --allow '**/xllm-cli/**' \
+  --allow 'Model::parse_value' \
+  --fail-above
+
+# 4. Quick aggregate summary (no table).
+cargo crap --workspace --lcov lcov.info \
+  --allow '**/xllm-cli/**' \
+  --allow 'Model::parse_value' \
+  --summary
+'''
+shell = "bash -c"
+usage = '''
+flag "-t --threshold <threshold>" help="Coverage threshold" default="80" env="RUST_COVERAGE_THRESHOLD"
+'''
+
+[tasks.tarpaulin]
+alias = ["tarpaulin"]
+depends = []
+depends_post = []
+description = "Measure production-code coverage with cargo-tarpaulin. All options (engine, outputs, ignores) live in tarpaulin.toml — the single source of truth — so this is a bare invocation."
+run = '''
+#!/usr/bin/env bash
+
+set -eou pipefail
+
+cargo tarpaulin --workspace --engine llvm\
+ --run-types Tests --run-types Doctests\
+ --fail-under "${usage_threshold?}"\
+ --out Xml Lcov
+'''
+shell = "bash -c"
+usage = '''
+flag "-t --threshold <threshold>" help="Coverage threshold" default="80" env="RUST_COVERAGE_THRESHOLD"
+'''
+
+[tasks.coverage]
+alias = ["cov"]
+depends = []
+depends_post = []
+description = "Run coverage (llvm-cov or tarpaulin) with a configurable threshold."
+run = '''
+#!/usr/bin/env bash
+
+set -eou pipefail
+
+if [[ "${usage_tester}" == "llvm-cov" ]]
+then
+  echo "mise run llvm-cov -t ${usage_threshold?}"
+  mise run llvm-cov -t "${usage_threshold?}"
+elif [[ "${usage_tester}" == "tarpaulin" ]]
+then
+  echo "mise run tarpaulin -t ${usage_threshold?}"
+  mise run tarpaulin -t "${usage_threshold?}"
+else
+  echo "Unknown tester: ${usage_tester}" >&2
+  exit 1
+fi
+'''
+shell = "bash -c"
+usage = '''
+flag "--tester <tester>" help="Coverage tester" default="llvm-cov" env="RUST_TESTER"
+flag "-t --threshold <threshold>" help="Coverage threshold" default="80" env="RUST_COVERAGE_THRESHOLD"
+'''
 
 [tasks.codecov]
 depends = ["coverage"]
+depends_post = []
 description = "Generate fresh coverage (./cobertura.xml) then upload it to Codecov. Thin wrapper: runs the coverage task, then delegates to codecov:upload so the codecovcli invocation lives in exactly one place (DRY)"
 run = '''
 #!/usr/bin/env bash
@@ -816,7 +910,7 @@ run = ["mise run reuse", "mise run miri"]
 # -- Coverage (HTML variants; the XML gate lives in [tasks.coverage] above) --
 
 [tasks."coverage:html"]
-depends = ["submodule"]
+depends = []
 description = "Coverage as browsable HTML. Engine/ignores come from tarpaulin.toml (the SSOT); this only adds the Html output"
 run = "cargo tarpaulin --out Html"
 
@@ -994,3 +1088,27 @@ mise run clean:fuzz
 rm -rf "${HOME}/.cargo/advisory-db"
 '''
 shell = "bash -c"
+
+[tasks.cancel-actions]
+alias = ["cancel-ci"]
+description = "Cancel all in-progress/queued GitHub Actions workflows for this repo"
+run = '''
+#!/usr/bin/env bash
+
+set -eou pipefail
+
+repo=$(gh repo view --json nameWithOwner --jq '.nameWithOwner')
+
+ids=$(gh run list --repo "${repo}" --limit 100 --json databaseId,status \
+  --jq '.[] | select(.status == "in_progress" or .status == "queued" or .status == "pending" or .status == "waiting") | .databaseId')
+
+if [[ -z "${ids}" ]]; then
+  echo "No running workflows to cancel."
+  exit 0
+fi
+
+echo "${ids}" | while IFS= read -r id; do
+  echo "Cancelling run ${id}..."
+  gh run cancel --repo "${repo}" "${id}"
+done
+'''
