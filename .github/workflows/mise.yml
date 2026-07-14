@@ -20,7 +20,7 @@ jobs:
   setup:
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: ./.github/actions/setup-rust-env
         id: rust-env
@@ -35,7 +35,7 @@ jobs:
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     needs: [setup]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: ./.github/actions/setup-rust-env
         id: rust-env
@@ -55,7 +55,7 @@ jobs:
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     needs: [setup]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: ./.github/actions/setup-rust-env
         id: rust-env
