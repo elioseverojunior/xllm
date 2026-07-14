@@ -1025,9 +1025,14 @@ run = ["mise run fuzz-all", "mise run bench", "mise run miri"]
 
 [tasks."update-actions-pins"]
 alias = "uap"
-description = "Check GitHub Actions SHA pins against latest releases (dry-run); pass --write to apply, --apply-major to also bump major versions. Requires GITHUB_TOKEN"
-run = "python3 scripts/update-actions-pins.py {{arg(args, default='')}}"
-usage = 'arg "[args]" var=#true help="args forwarded to script, e.g. --write --apply-major"'
+description = "Update all GitHub Actions SHA pins to latest releases. Automatically sets GITHUB_TOKEN via gh auth."
+run = '''
+#!/usr/bin/env bash
+set -eou pipefail
+export GITHUB_TOKEN=$(gh auth token)
+python3 scripts/update-actions-pins.py --write --apply-major
+unset GITHUB_TOKEN
+'''
 
 [tasks."ci:full"]
 description = "ci + performance gate"
