@@ -22,11 +22,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
-permissions:
-  contents: write
-  id-token: write
-  pages: write
-  pull-requests: write
+permissions: read-all
 
 jobs:
   validate:
@@ -73,6 +69,9 @@ jobs:
     if: needs.validate.outputs.should_publish == 'true'
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     environment: crates-io
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:

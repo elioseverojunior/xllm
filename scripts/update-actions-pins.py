@@ -474,6 +474,8 @@ async def check_ref(client: httpx.AsyncClient, ar: ActionRef) -> PinResult:
                 return PinResult(
                     ar,
                     "major-bump",
+                    new_sha=sha,
+                    tag=tag,
                     message=f"major bump: v{ar.major} -> v{latest_major} ({tag})",
                 )
             return _updated(ar, sha, tag)
@@ -487,6 +489,8 @@ async def check_ref(client: httpx.AsyncClient, ar: ActionRef) -> PinResult:
                 return PinResult(
                     ar,
                     "major-bump",
+                    new_sha=sha,
+                    tag=tag,
                     message=f"major bump: v{ar.major} -> v{latest_major} ({tag})",
                 )
         return _updated(ar, sha, tag)
@@ -606,7 +610,7 @@ async def main_async(args: argparse.Namespace) -> int:
         elif r.status == "major-bump":
             major_bumps += 1
             note = " (use --apply-major)" if not args.apply_major else ""
-            log.info(f" MAJR {tag_display:50s}  {r.message}{note}")
+            log.info(f" MAJOR {tag_display:50s}  {r.message}{note}")
             if args.apply_major and r.new_sha:
                 if await apply_pin(r.ref.file, r.ref, r.new_sha, tag=r.tag):
                     changed += 1
