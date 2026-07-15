@@ -11,3 +11,10 @@ node_modules/
 ### Always add
 !opencode.json
 scripts/__pycache__/update-actions-pins.cpython-314.pyc
+
+# Editor artifacts
+undefined/
+cobertura.xml
+/lcov.info
+/build_rs_cov.profraw
+/results.sarif

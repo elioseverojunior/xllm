@@ -1,15 +1,22 @@
 [package]
+authors.workspace = true
+categories = ["compression"]
 description = "Model quantization formats (Q4_0, Q5_1, Q8_0, etc.)"
+documentation.workspace = true
 edition.workspace = true
+keywords = ["quantization", "q4_0", "q8_0", "compression", "model"]
 license.workspace = true
 name = "xllm-quantize"
+readme = "README.md"
+repository.workspace = true
+rust-version.workspace = true
 version.workspace = true
 
-[lints]
-workspace = true
+[package.metadata.cargo-machete]
+ignored = ["xllm-tensor"]
 
 [dependencies]
 xllm-tensor.workspace = true
 
-[package.metadata.cargo-machete]
-ignored = ["xllm-tensor"]
+[lints]
+workspace = true

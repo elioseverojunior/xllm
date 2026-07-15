@@ -1,0 +1,18 @@
+# Default owners for all files
+* @elioseverojunior
+
+# GitHub Actions workflows and actions
+.github/ @elioseverojunior
+
+# Rust crates
+crates/ @elioseverojunior
+
+# Project documentation
+*.md @elioseverojunior
+docs/ @elioseverojunior
+
+# Configuration files
+*.toml @elioseverojunior
+*.yml @elioseverojunior
+*.yaml @elioseverojunior
+mise.toml @elioseverojunior

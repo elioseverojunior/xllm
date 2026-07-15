@@ -2,6 +2,7 @@
 name: instructions.md
 created_by: elioseverojunior@gmail.com
 ---
+
 # Intructions
 
 I want to build a new Project called `xllm` pure in rust lang. However it's must follow the existing project `llama.cpp`.
@@ -13,7 +14,7 @@ On feature I want to enable GPu models support (AMD and Nvidia GPUs), so we need
 
 ## Rust SDK Requirements
 
-- Must use Rust (nightly) that allow new features.
+- Must use Rust (stable) that allow new features.
 - We must focus on Security-first and Performance
 
 ## AI Requirements

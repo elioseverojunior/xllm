@@ -272,7 +272,7 @@ All shared metadata lives in the root `Cargo.toml`:
 - `[workspace.dependencies]` -- shared external and internal dependencies.
 
 Build profiles and target-specific linker flags are in `.cargo/config.toml`.
-Rust toolchain is pinned via `rust-toolchain.toml` (nightly).
+Rust toolchain is pinned via `rust-toolchain.toml` (stable).
 
 ---
 

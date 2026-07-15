@@ -2,7 +2,7 @@
 #
 # actionlint auto-discovers this file at .github/actionlint.yaml (no --config
 # flag needed, mirroring how gitleaks finds .gitleaks.toml and yamllint finds
-# .yamllint.yml). It lints every workflow under .github/workflows for syntax
+# .yamllint). It lints every workflow under .github/workflows for syntax
 # errors, expression typos, shellcheck findings in `run:` scripts, and unknown
 # action inputs.
 
@@ -24,6 +24,7 @@ self-hosted-runner:
 # introduced. Set to `null` to disable the check entirely.
 config-variables:
   - RUNS_ON
+  - RUST_COVERAGE_TRESHOLD
 
 # Path-specific configurations.
 paths:

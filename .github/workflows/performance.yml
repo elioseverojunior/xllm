@@ -1,5 +1,9 @@
 name: Performance
 
+concurrency:
+  group: performance-${{ github.ref_name }}
+  cancel-in-progress: ${{ github.ref_name != github.event.repository.default_branch }}
+
 # Per-change benchmark gate. Compares the PR/commit against the baseline
 # stored on the `gh-pages` branch and fails the run on a measurable
 # regression. The baseline is only updated by pushes to `main`.
@@ -9,14 +13,7 @@ name: Performance
 on:
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pull-requests: write
-  deployments: write
-
-concurrency:
-  group: performance-${{ github.ref_name }}
-  cancel-in-progress: ${{ github.ref_name != github.event.repository.default_branch }}
+permissions: read-all
 
 env:
   CARGO_TERM_COLOR: always
@@ -27,18 +24,18 @@ jobs:
     name: Bench vs main baseline
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 45
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           submodules: recursive
           fetch-depth: 0
 
-      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30  # stable
-
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
+      - uses: ./.github/actions/setup-rust-env
         with:
-          shared-key: perf
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          rust-cache-shared-key: perf
 
       - name: Check for benchmarks
         id: has-benches

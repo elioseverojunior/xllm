@@ -3,9 +3,10 @@
 CPU-first LLM inference engine in pure Rust -- a port of [llama.cpp](https://github.com/ggml-org/llama.cpp).
 
 [![MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](#license)
-![Rust Nightly](https://img.shields.io/badge/rust-nightly-purple)
+![Rust Stable](https://img.shields.io/badge/rust-stable-purple)
 ![Unsafe Forbidden](https://img.shields.io/badge/unsafe-forbidden-red)
 ![Status: Prototype](https://img.shields.io/badge/status-prototype-yellow)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/elioseverojunior/xllm/badge)](https://securityscorecards.dev/viewer/?uri=github.com/elioseverojunior/xllm)
 
 ## Overview
 
@@ -21,17 +22,18 @@ xllm reimplements llama.cpp's architecture entirely in Rust with zero unsafe cod
 
 ## Project Status
 
-**Phase 0 -- Scaffolding.** The workspace compiles and all 11 crates are wired together, but no inference code is implemented yet.
+**Phase 1 -- CLI & Download.** The workspace compiles, the CLI skeleton is in place with `download` and `run` subcommands, and GGUF models can be fetched from HuggingFace Hub and cached locally.
 
-| Phase | Focus | Timeline |
-|-------|-------|----------|
-| 0 | Workspace, CI/toolchain, project setup | 2026 Q3 |
-| 1 | Tensor ops, compute graph, GGUF reader, tokenizer | 2026 Q4 |
-| 2 | KV cache, attention, sampling, CLI, quantization | 2027 Q1 |
-| 3 | SIMD (AVX2, NEON), multithreaded CPU, memory optimization | 2027 Q2 |
-| 3b | BitNet b1.58 ternary kernels | 2027 Q2-Q3 |
-| 4 | GPU backends: CUDA, HIP (AMD) | 2027 Q3-Q4 |
-| 5 | LoRA, vLLM batching, training, HTTP server | 2027 Q4+ |
+| Phase | Focus | Timeline | Status |
+|-------|-------|----------|--------|
+| 0 | Workspace, CI/toolchain, project setup | 2026 Q3 | Done |
+| 1a | CLI skeleton, HuggingFace download, GGUF cache | 2026 Q3 | Done |
+| 1b | Tensor ops, compute graph, GGUF reader, tokenizer | 2026 Q4 | Pending |
+| 2 | KV cache, attention, sampling, CLI inference, quantization | 2027 Q1 | Pending |
+| 3 | SIMD (AVX2, NEON), multithreaded CPU, memory optimization | 2027 Q2 | Pending |
+| 3b | BitNet b1.58 ternary kernels | 2027 Q2-Q3 | Pending |
+| 4 | GPU backends: CUDA, HIP (AMD) | 2027 Q3-Q4 | Pending |
+| 5 | LoRA, vLLM batching, training, HTTP server | 2027 Q4+ | Pending |
 
 ## Architecture
 
@@ -70,7 +72,7 @@ Eleven crates under `crates/`:
 ### Prerequisites
 
 - [mise](https://mise.jdx.dev) -- provisions the Rust toolchain and all dev tools
-- Rust nightly (installed automatically by mise via `rust-toolchain.toml`)
+- Rust stable (installed automatically by mise via `rust-toolchain.toml`)
 - Node 24+ (for Markdown lint toolchain)
 
 ### Setup
@@ -100,10 +102,12 @@ mise run test-doc       # cargo test --doc (doctests)
 ### Run
 
 ```sh
-cargo run -p xllm-cli
-```
+# Download a GGUF model from HuggingFace Hub (cached to ~/.cache/huggingface/hub/)
+cargo run -p xllm-cli -- download --repo TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF
 
-As a placeholder, it currently prints `Hello, xllm!`.
+# Run inference on a downloaded model
+cargo run -p xllm-cli -- run --model ~/.cache/huggingface/hub/tinyllama-1.1b-chat-v1.0.Q2_K.gguf --prompt "Hello"
+```
 
 ### Full Quality Gate
 
@@ -116,7 +120,7 @@ Or run every check manually in the prescribed order:
 ```sh
 cargo sort --workspace --check \
   && taplo format --check Cargo.toml crates/*/Cargo.toml \
-  && pnpm lint:md \
+  && mise run markdownlint \
   && cargo fmt --check \
   && cargo clippy -- -D warnings \
   && cargo audit --deny warnings \
@@ -149,10 +153,10 @@ All dev tools are provisioned by mise and pinned in `mise.toml` for reproducible
 | `cargo mutants` | Mutation testing |
 | `cargo semver-checks` | API semver verification |
 | `gitleaks` | Secret scanning |
-| `lefthook` | Git hook manager |
+| `hk` | Git hook manager (Rust) |
 | `git-cliff` | Changelog generation |
-| `markdownlint-cli2` | Markdown lint (GitHub ruleset) |
-| `yamllint` | YAML lint |
+| `rumdl` | Markdown lint |
+| `yamllint-rs` | YAML lint (Rust) |
 | `actionlint` | GitHub Actions workflow lint |
 | `reuse` | SPDX/REUSE compliance |
 

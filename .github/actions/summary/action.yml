@@ -1,0 +1,50 @@
+name: "Summary Report"
+description: "Generate a GitHub Step Summary from a SARIF report file"
+inputs:
+  file-path:
+    description: "Path to the SARIF report file"
+    required: true
+  title:
+    description: "Report title for the summary header"
+    required: false
+    default: "Scan Summary"
+  tool-name:
+    description: "Name of the scanning tool (for display)"
+    required: false
+    default: "Scan"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Generate ${{ inputs.tool-name }} Summary Report
+      shell: bash -l {0}
+      run: |
+        set -euo pipefail
+
+        FILE="${{ inputs.file-path }}"
+        TITLE="${{ inputs.title }}"
+        TOOL="${{ inputs.tool-name }}"
+
+        if [ ! -f "$FILE" ]; then
+          echo "### $TOOL Report" >> $GITHUB_STEP_SUMMARY
+          echo "No SARIF file found at \`$FILE\`. $TOOL may not have run or failed unexpectedly." >> $GITHUB_STEP_SUMMARY
+          exit 0
+        fi
+
+        TOTAL=$(jq '[.runs[].results[]] | length' "$FILE")
+
+        echo "### $TOOL Summary" >> $GITHUB_STEP_SUMMARY
+
+        if [ "$TOTAL" -eq "0" ]; then
+          echo "**No issues detected.**" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "**$TOTAL issue(s) found.**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Rule ID | File | Line | Description |" >> $GITHUB_STEP_SUMMARY
+          echo "| --- | --- | --- | --- |" >> $GITHUB_STEP_SUMMARY
+
+          jq -r '.runs[].results[] | "\(.ruleId)|\(.locations[0].physicalLocation.artifactLocation.uri)|\(.locations[0].physicalLocation.region.startLine)|\(.message.text)"' "$FILE" \
+            | while IFS='|' read -r rule file line msg; do
+              echo "| \`$rule\` | \`$file\` | $line | $msg |" >> $GITHUB_STEP_SUMMARY
+            done
+        fi

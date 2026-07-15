@@ -1,0 +1,71 @@
+name: Mise
+
+concurrency:
+  group: mise-${{ github.ref_name }}
+  cancel-in-progress: ${{ github.ref_name != github.event.repository.default_branch }}
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Top-level read-all; jobs that upload results need additional write permissions.
+permissions: read-all
+
+jobs:
+  setup:
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - uses: ./.github/actions/setup-rust-env
+        id: rust-env
+
+      - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d  # v4.2.0
+        with:
+          cache_key: mise-${{ steps.rust-env.outputs.cache-key }}
+
+  lint:
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    needs: [setup]
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - uses: ./.github/actions/setup-rust-env
+        id: rust-env
+
+      - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d  # v4.2.0
+        with:
+          cache_key: mise-${{ steps.rust-env.outputs.cache-key }}
+          install: false
+      - run: |
+          mise run cargo-sort
+          mise run taplo
+          mise run fmt
+
+  test:
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    needs: [setup]
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - uses: ./.github/actions/setup-rust-env
+        id: rust-env
+
+      - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d  # v4.2.0
+        with:
+          cache_key: mise-${{ steps.rust-env.outputs.cache-key }}
+          install: false
+
+      - run: |
+          mise run coverage

@@ -1,9 +1,15 @@
 name: Nightly Fuzz & Bench
 
+concurrency:
+  group: nightly-fuz-bench-${{ github.ref_name }}
+  cancel-in-progress: ${{ github.ref_name != github.event.repository.default_branch }}
+
 on:
   schedule:
     - cron: "0 4 * * *"
   workflow_dispatch:
+
+permissions: read-all
 
 env:
   CARGO_TERM_COLOR: always
@@ -12,6 +18,8 @@ jobs:
   fuzz:
     name: Fuzz
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
@@ -61,14 +69,17 @@ jobs:
   bench:
     name: Benchmarks
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           submodules: recursive
 
-      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30  # stable
-
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
+      - uses: ./.github/actions/setup-rust-env
+        with:
+          toolchain: "nightly"
+          rust-cache-shared-key: nightly
 
       - name: Check for benchmarks
         id: has-benches
@@ -93,6 +104,8 @@ jobs:
   miri:
     name: Miri (UB / strict-provenance)
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
