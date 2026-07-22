@@ -11,7 +11,7 @@
 title = "XLLM gitleaks config"
 
 [extend]
-# Pull in gitleaks' maintained ruleset rather than re-deriving ~150 rules here.
+# Pull in gitleaks maintained ruleset rather than re-deriving ~150 rules here.
 # Upstream rule fixes then flow in on every gitleaks upgrade.
 useDefault = true
 
@@ -30,6 +30,8 @@ paths = [
   '''(^|/)LICENSE-(MIT|APACHE)$''',
   # This config itself, so any example patterns below never self-trigger.
   '''\.gitleaks\.toml$''',
+  # Local act runner secrets (gitignored, not committed).
+  '''\.act/\.secrets$''',
 ]
 
 # ---------------------------------------------------------------------------
@@ -39,5 +41,5 @@ paths = [
 # id = "xllm-internal-token"
 # description = "XLLM internal service token"
 # regex = '''skald_(test|live)_[0-9a-zA-Z]{32}'''
-# keywords = ["skald_"]
+# keywords = [""]
 # ---------------------------------------------------------------------------

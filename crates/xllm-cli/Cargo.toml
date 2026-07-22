@@ -1,15 +1,29 @@
 [package]
-description = "Command-line interface for xllm inference engine"
+authors.workspace = true
+categories = ["command-line-utilities"]
+description = "CLI for xllm: download, run, and manage GGUF models from HuggingFace Hub"
+documentation.workspace = true
 edition.workspace = true
+keywords = ["cli", "download", "huggingface", "gguf", "inference"]
 license.workspace = true
 name = "xllm-cli"
+readme = "README.md"
+repository.workspace = true
+rust-version.workspace = true
 version.workspace = true
+
+[dependencies]
+clap = { workspace = true }
+dirs = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+xllm = { workspace = true }
+
+[[bin]]
+name = "xllm"
+path = "src/main.rs"
 
 [lints]
 workspace = true
-
-[dependencies]
-xllm.workspace = true
-
-[package.metadata.cargo-machete]
-ignored = ["xllm"]

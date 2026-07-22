@@ -1,15 +1,21 @@
 [package]
+authors.workspace = true
+categories = ["text-processing"]
 description = "BPE and SentencePiece tokenizer for LLM text processing"
+documentation.workspace = true
 edition.workspace = true
+keywords = ["tokenizer", "bpe", "sentencepiece", "tokenization", "nlp"]
 license.workspace = true
 name = "xllm-tokenizer"
+readme = "README.md"
+repository.workspace = true
+rust-version.workspace = true
 version.workspace = true
+
+[dependencies]
+num-traits.workspace = true
+thiserror.workspace = true
+xllm-model.workspace = true
 
 [lints]
 workspace = true
-
-[dependencies]
-byteorder.workspace = true
-
-[package.metadata.cargo-machete]
-ignored = ["byteorder"]

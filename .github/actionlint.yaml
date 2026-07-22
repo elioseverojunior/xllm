@@ -2,7 +2,7 @@
 #
 # actionlint auto-discovers this file at .github/actionlint.yaml (no --config
 # flag needed, mirroring how gitleaks finds .gitleaks.toml and yamllint finds
-# .yamllint.yml). It lints every workflow under .github/workflows for syntax
+# .yamllint). It lints every workflow under .github/workflows for syntax
 # errors, expression typos, shellcheck findings in `run:` scripts, and unknown
 # action inputs.
 
@@ -23,7 +23,12 @@ self-hosted-runner:
 # string at runtime. Add new repository/organization variables here as they are
 # introduced. Set to `null` to disable the check entirely.
 config-variables:
+  - APP_ID
+  - CLIENT_ID
+  - GITVERSION_SPEC
   - RUNS_ON
+  - RUNS_ON_ARM64
+  - RUST_COVERAGE_TRESHOLD
 
 # Path-specific configurations.
 paths:
@@ -32,6 +37,13 @@ paths:
   .github/workflows/**/*.{yml,yaml}:
     # List of regular expressions to filter errors by the error messages.
     ignore:
+      # actionlint's pinned action metadata for actions/create-github-app-token
+      # still treats `app-id` as required and does not recognize the documented
+      # `client-id` input. Both inputs exist upstream (app-id is deprecated in
+      # favor of client-id), so suppress these two stale-metadata errors only.
+      # See: https://github.com/actions/create-github-app-token/blob/main/action.yml
+      - 'missing input "app-id" which is required by action "actions/create-github-app-token@v\d+'
+      - 'input "client-id" is not defined in action "actions/create-github-app-token@v\d+'
       # Ignore the specific error from shellcheck
       - 'shellcheck reported issue in this script: SC2086:.+'
       - 'shellcheck reported issue in this script: SC2129:.+'

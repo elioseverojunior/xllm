@@ -1,0 +1,47 @@
+# yamllint-rs configuration ~ https://github.com/AvnerCohen/yamllint-rs
+# Uses the same format as Python yamllint for compatibility.
+
+extends: default
+
+# The YAML test:suite submodule is a conformance corpus full of intentionally
+# malformed fixtures — never lint it (also covers manual `yamllint-rs .` runs).
+# pnpm-lock.yaml and node_modules belong to the dev-only Markdown toolchain and
+# are machine-generated, so they are excluded too.
+ignore: |
+  crates/xllm-yaml-test:suite/data/
+  pnpm-lock.yaml
+  node_modules/
+  target/
+  *.md
+  CONTRIBUTING.md
+  CII_BEST_PRACTICES.md
+  CODE_OF_CONDUCT.md
+  SECURITY.md
+  INSTRUCTIONS.md
+  AGENTS.md
+  CHANGELOG.md
+  README.md
+
+rules:
+  # Completely ignore comment formatting rules
+  comments: disable
+
+  # Commented-out config blocks (e.g. the disabled post-commit job) aren't
+  # indented like surrounding content; don't flag that.
+  comments-indentation: disable
+
+  # yamllint-rs indentation rule has a bug: after a sequence with multiple
+  # items, it incorrectly expects the next sibling key to be indented at 4
+  # spaces instead of 2. Disable until fixed upstream.
+  # See: https://github.com/AvnerCohen/yamllint-rs/issues (likely)
+  indentation: disable
+
+  # Allow longer lines than the 80-char default; keep it advisory, not fatal.
+  line-length: disable
+
+  # Our hand-written configs (mise tasks) don't start with `---`.
+  document-start: disable
+
+  # GitHub Actions workflows use `on:` as a mapping key, which YAML 1.1 reads as
+  # a boolean. Don't flag mapping keys for truthiness (values are still checked).
+  truthy: disable

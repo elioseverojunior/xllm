@@ -1,0 +1,39 @@
+name: act
+
+on: push
+
+jobs:
+  test-action:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: 'recursive'
+
+      - name: Setup Rust toolchain
+        id: rust-toolchain
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+
+      - name: Cargo Cache
+        id: cargo-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/bin
+          key: cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') || hashFiles('Cargo.toml') || hashFiles('~/.cargo/bin/*') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-${{ runner.arch }}-
+            cargo-${{ runner.os }}-
+
+      - name: Get Rust version
+        id: rust-version
+        shell: bash -l {0}
+        run: |
+          echo "version=$(rustc --version)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup mise
+        id: mise-setup
+        uses: jdx/mise-action@dad1bfd3df957f44999b559dd69dc1671cb4e9ea # v4.2.1
+        with:
+          cache_key_prefix: mise
+          cache_key: mise-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('mise.lock') || hashFiles('mise.toml') }}

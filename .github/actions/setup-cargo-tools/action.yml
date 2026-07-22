@@ -8,7 +8,7 @@ inputs:
   arch:
     description: "Architecture (x86_64, aarch64, etc.)"
     required: false
-    default: "x86_64"
+    default: ""
 
 runs:
   using: "composite"
@@ -33,7 +33,7 @@ runs:
 
     - name: Cache cargo tools
       id: cache-cargo-tools
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cargo/bin
         key: ${{ runner.os }}-${{ steps.detect-arch.outputs.arch }}-cargo-tools-${{ steps.detect-arch.outputs.tools-key }}-${{ hashFiles('~/.cargo/bin/*') }}

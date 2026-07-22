@@ -1,0 +1,13 @@
+name: "Setup Cargo Tools"
+description: "Setup missing project cargo tools."
+inputs:
+  github_token:
+    description: "GitHub Token"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - uses: jdx/mise-action@dad1bfd3df957f44999b559dd69dc1671cb4e9ea # v4.2.1
+      with:
+        github_token: ${{ inputs.github_token }}

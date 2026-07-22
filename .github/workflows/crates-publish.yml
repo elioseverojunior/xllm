@@ -1,5 +1,9 @@
 name: Publish to crates.io
 
+concurrency:
+  group: crates-publish-${{ github.ref_name }}
+  cancel-in-progress: ${{ github.ref_name != github.event.repository.default_branch }}
+
 on:
   release:
     types: [published]
@@ -15,24 +19,22 @@ on:
         type: boolean
         default: false
 
+permissions: read-all
+
 env:
   CARGO_TERM_COLOR: always
-
-permissions:
-  contents: write
-  id-token: write
-  pages: write
-  pull-requests: write
 
 jobs:
   validate:
     name: Validate Release
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      contents: read
     outputs:
       should_publish: ${{ steps.check.outputs.should_publish }}
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: "0"
@@ -69,8 +71,11 @@ jobs:
     if: needs.validate.outputs.should_publish == 'true'
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     environment: crates-io
+    permissions:
+      id-token: write
+      contents: read
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: "0"
@@ -81,12 +86,12 @@ jobs:
       - name: GitHub Actions Bot Setup
         uses: ./.github/actions/bot-setup
 
-      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30  # stable
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
 
       - name: Crates.io Authentication
         id: crates-auth
         if: github.event.inputs.dry_run != 'true'
-        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18  # v1.0.5
+        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
 
       - name: Verify packages
         run: |
@@ -146,7 +151,7 @@ jobs:
       pages: write
       id-token: write
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: "0"
@@ -157,7 +162,7 @@ jobs:
       - name: GitHub Actions Bot Setup
         uses: ./.github/actions/bot-setup
 
-      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30  # stable
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
 
       - name: Build documentation
         run: |
@@ -165,13 +170,13 @@ jobs:
           echo '<meta http-equiv="refresh" content="0; url=xllm/index.html">' > target/doc/index.html
 
       - name: Upload artifact for GitHub Pages
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9  # v5.0.0
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: target/doc
 
       - name: Deploy to GitHub Pages
         if: github.event.inputs.dry_run != 'true'
-        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128  # v5.0.0
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
         with:
           token: ${{ github.token }}
 

@@ -2,6 +2,7 @@
 name: instructions.md
 created_by: elioseverojunior@gmail.com
 ---
+
 # Intructions
 
 I want to build a new Project called `xllm` pure in rust lang. However it's must follow the existing project `llama.cpp`.
@@ -13,7 +14,7 @@ On feature I want to enable GPu models support (AMD and Nvidia GPUs), so we need
 
 ## Rust SDK Requirements
 
-- Must use Rust (nightly) that allow new features.
+- Must use Rust (stable) that allow new features.
 - We must focus on Security-first and Performance
 
 ## AI Requirements
@@ -28,14 +29,15 @@ Check the [docs/guidelines/contribution.md](docs/guidelines/contribution.md)
 Ensure we use TDD before write any codeline.
 Ensure the development principles:
 
-1. TDD (If we need to change a existing code without TDD, first write the
+1. The codebase must have 100% of coverage.
+2. TDD (If we need to change an existing code without TDD, first write the
    test using TDD and ensure the test is working and then start to
-   convert/refactor the context we intended to modify, always doing TDD
-   implementation loop till green)
-2. KISS (Keep It Simple, Stupid)
-3. DRY (Don’t Repeat Yourself)
-4. YAGNI (You Aren’t Gonna Need It)
-5. TDA (Tell Don’t Ask)
-6. SOLID (Use the SOLID Principles that make sense to the project).
+   refactor the context we intended to modify, always doing TDD
+   implementation loop red -> code -> loop test till green.)
+3. KISS (Keep It Simple, Stupid)
+4. DRY (Don’t Repeat Yourself)
+5. YAGNI (You Aren’t Gonna Need It)
+6. TDA (Tell Don’t Ask)
+7. SOLID (Use the SOLID Principles that make sense to the project).
 
 Write the plan into [docs/plan/XLLM_PLAN.md](docs/plan/XLLM_PLAN.md)

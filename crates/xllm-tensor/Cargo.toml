@@ -1,15 +1,23 @@
 [package]
+authors.workspace = true
+categories = ["data-structures", "science"]
 description = "Tensor operations for LLM inference (matmul, reshape, slicing, etc.)"
+documentation.workspace = true
 edition.workspace = true
+keywords = ["tensor", "ndarray", "half-precision", "numerical", "matrix"]
 license.workspace = true
 name = "xllm-tensor"
+readme = "README.md"
+repository.workspace = true
+rust-version.workspace = true
 version.workspace = true
-
-[lints]
-workspace = true
-
-[dependencies]
-half.workspace = true
 
 [package.metadata.cargo-machete]
 ignored = ["half"]
+
+[dependencies]
+half.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

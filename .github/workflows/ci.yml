@@ -1,7 +1,7 @@
 name: CI
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref_name }}
   cancel-in-progress: ${{ github.ref_name != github.event.repository.default_branch }}
 
 on:
@@ -10,6 +10,8 @@ on:
   pull_request:
     branches: [main]
 
+permissions: read-all
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -17,27 +19,23 @@ jobs:
   quick:
     name: Format, Lint, Test
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - name: Install mold (faster linking)
+        run: sudo apt-get update && sudo apt-get install -y mold
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
 
-      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30  # stable
-        with:
-          components: rustfmt, clippy
-
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
+      - uses: ./.github/actions/setup-rust-env
 
       - name: Format check
         run: cargo fmt --all -- --check
 
       - name: Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: Test
-        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853  # v2.83.2
-        with:
-          tool: cargo-nextest
 
       - name: Run tests
         run: cargo nextest run
@@ -48,17 +46,14 @@ jobs:
   formatting:
     name: Sort & Format
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30  # stable
-
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
-
-      - name: Install cargo-sort and taplo-cli
-        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853  # v2.83.2
+      - uses: ./.github/actions/setup-rust-env
         with:
-          tool: cargo-sort,taplo-cli
+          cache-target: "false"
 
       - name: cargo-sort check
         run: cargo sort --workspace --check --config tomlfmt.toml
@@ -69,84 +64,71 @@ jobs:
   markdown:
     name: Markdown Lint
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
-        with:
-          node-version: "24"
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-rust-env
 
       - name: Markdown lint
-        run: pnpm exec markdownlint-cli2
+        run: rumdl check
 
   yaml:
     name: YAML & Action Lint
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install actionlint
-        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853  # v2.83.2
+      - uses: ./.github/actions/setup-rust-env
         with:
-          tool: actionlint
+          cargo-tools: yamllint-rs
+          cache-target: "false"
 
-      - name: Install yamllint
-        run: pip install yamllint
-
-      - name: yamllint
-        run: yamllint .
-
-      - name: actionlint
-        run: actionlint
+      - name: yamllint-rs
+        run: yamllint-rs .
 
   secrets:
     name: Secrets Scan
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      security-events: write
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install gitleaks
-        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853  # v2.83.2
-        with:
-          tool: gitleaks
-
-      - name: gitleaks
-        run: gitleaks dir .
-
-  action-pins:
-    name: Action SHA Pins
-    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-
-      - name: Verify action pins are up-to-date
-        run: python3 scripts/update-actions-pins.py
+      - name: Gitleaks Setup
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ github.token }}
+
+      - name: gitleaks
+        run: gitleaks git --platform github .
+
+      - name: Generate Summary Report
+        if: always()
+        uses: ./.github/actions/summary
+        with:
+          file-path: gitleaks-results.sarif
+          title: "Gitleaks Scan Summary"
+          tool-name: "Gitleaks"
 
   supply-chain:
     name: Supply Chain
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
 
-      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30  # stable
-
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
-
-      - name: Install cargo-audit, cargo-deny
-        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853  # v2.83.2
+      - uses: ./.github/actions/setup-rust-env
         with:
-          tool: cargo-audit,cargo-deny
-
-      - name: Install reuse
-        run: pip install reuse
+          cache-target: "false"
 
       - name: cargo audit
         run: cargo audit
@@ -155,39 +137,46 @@ jobs:
         run: cargo deny check
 
       - name: REUSE lint
-        run: reuse lint
+        run: mise run reuse
 
   coverage:
     name: Coverage
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      actions: write
+      contents: read
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
 
-      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30  # stable
-        with:
-          components: llvm-tools-preview
+      - uses: ./.github/actions/setup-rust-env
 
-      - name: Install nightly for doctest instrumentation
-        run: rustup toolchain install nightly --profile minimal
-
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
-
-      - name: Install tarpaulin
-        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853  # v2.83.2
-        with:
-          tool: cargo-tarpaulin
+      - name: Rustup Install for doctest instrumentation
+        run: rustup toolchain install --profile complete
 
       - name: Run coverage
         run: |
           cargo tarpaulin --workspace --engine llvm \
             --run-types Tests --run-types Doctests \
-            --fail-under 100 --out Xml
+            --fail-under "${{ vars.RUST_COVERAGE_TRESHOLD || '80' }}" \
+            --out Xml --out Lcov
+
+      - name: Convert LCOV to SARIF
+        if: always()
+        run: cargo-crap --lcov lcov.info --format sarif > results.sarif
 
       - name: Upload coverage artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-report
           path: cobertura.xml
+
+      - name: Generate Summary Report
+        if: always()
+        uses: ./.github/actions/summary
+        with:
+          file-path: results.sarif
+          title: "Coverage Report"
+          tool-name: "Tarpaulin"

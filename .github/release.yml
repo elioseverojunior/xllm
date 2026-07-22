@@ -1,0 +1,78 @@
+# Configuration for GitHub auto-generated release notes
+# https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes
+#
+# Categories key off the labels applied by .github/workflows/labeler.yml.
+
+changelog:
+  exclude:
+    labels:
+      - skip-changelog
+      - duplicate
+      - invalid
+    authors:
+      - dependabot
+      - dependabot[bot]
+
+  categories:
+    - title: 🎉 Initialization
+      labels:
+        - type:init
+
+    - title: 🚀 Features
+      labels:
+        - type:feature
+        - enhancement
+
+    - title: 🐛 Bug Fixes
+      labels:
+        - type:bugfix
+        - bug
+        - bugfix
+
+    - title: 📚 Documentation
+      labels:
+        - type:documentation
+        - documentation
+        - docs
+
+    - title: ⚡ Performance
+      labels:
+        - type:performance
+        - performance
+
+    - title: 🔧 Refactoring
+      labels:
+        - type:refactor
+        - refactor
+
+    - title: 🎨 Styling
+      labels:
+        - type:style
+
+    - title: 🧪 Testing
+      labels:
+        - type:test
+        - tests
+
+    - title: 📦 Build
+      labels:
+        - type:build
+        - build
+
+    - title: 👷 CI/CD
+      labels:
+        - type:ci
+        - ci
+
+    - title: 🔨 Miscellaneous
+      labels:
+        - type:chore
+        - chore
+
+    - title: ⏪ Reverts
+      labels:
+        - type:revert
+
+    - title: ⬆️ Dependencies
+      labels:
+        - dependencies

@@ -1,15 +1,22 @@
 [package]
+authors.workspace = true
+categories = ["algorithms"]
 description = "1-bit ternary kernels for BitNet b1.58 inference"
+documentation.workspace = true
 edition.workspace = true
+keywords = ["bitnet", "ternary", "1-bit", "kernels", "quantization"]
 license.workspace = true
 name = "xllm-bitnet"
+readme = "README.md"
+repository.workspace = true
+rust-version.workspace = true
 version.workspace = true
 
-[lints]
-workspace = true
+[package.metadata.cargo-machete]
+ignored = ["xllm-tensor"]
 
 [dependencies]
 xllm-tensor.workspace = true
 
-[package.metadata.cargo-machete]
-ignored = ["xllm-tensor"]
+[lints]
+workspace = true

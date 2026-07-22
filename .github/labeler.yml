@@ -1,0 +1,71 @@
+# Configuration for actions/labeler
+# https://github.com/actions/labeler
+
+# Label based on file paths
+source:
+  - changed-files:
+      - any-glob-to-any-file: "src/**/*"
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.test.ts"
+          - "**/*.spec.ts"
+          - "__tests__/**/*"
+          - "__mocks__/**/*"
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "*.md"
+          - "docs/**/*"
+          - "examples/**/*"
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/**/*"
+          - "cliff.toml"
+          - "GitVersion.yml"
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "package.json"
+          - "yarn.lock"
+          - ".nvmrc"
+
+config:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "tsconfig*.json"
+          - "jest.config.*"
+          - ".eslintrc*"
+          - ".prettierrc*"
+          - "action.yml"
+
+build:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "dist/**/*"
+
+github-actions:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "/**/*/action.yml"
+          - "src/actions/**/*"
+
+docker:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/actions/docker/**/*"
+
+terraform:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/actions/iac/terraform/**/*"
+
+terragrunt:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/actions/iac/terragrunt/**/*"

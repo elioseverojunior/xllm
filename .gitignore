@@ -1,13 +1,19 @@
 ### Ignored
+/**/target/
+/**/node_modules/
+/**/worktree/
+/**/.worktree/
+/**/worktrees/
+/**/.worktrees/
+/**/__pycache__/
+/**/undefined/
+/**/.act/
 
-/target
-node_modules/
-
-/worktree/
-/.worktree/
-/worktrees/
-/.worktrees/
-
+# Editor artifacts
+/**/cobertura.xml
+/**/lcov.info
+/**/build_rs_cov.profraw
+/**/results.sarif
 ### Always add
 !opencode.json
-scripts/__pycache__/update-actions-pins.cpython-314.pyc
+!/**/.act/README.md

@@ -1,0 +1,9 @@
+-P=ubuntu-latest=catthehacker/ubuntu:full-latest
+--pull=false
+--container-daemon-socket=/var/run/docker.sock
+--eventpath=./.act/event.json
+--secret-file=./.act/.secrets
+--var-file=./.act/.vars
+--detect-event
+--use-gitignore
+--use-new-action-cache

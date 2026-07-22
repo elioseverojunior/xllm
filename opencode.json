@@ -9,36 +9,7 @@
   "agent": {
     "xllm": {
       "description": "Autonomous development agent for xllm - Rust LLM inference engine (llama.cpp port). TDD-first, CPU-primary, nightly Rust.",
-      "mode": "primary",
-      "permission": {
-        "read": "allow",
-        "edit": "allow",
-        "glob": "allow",
-        "grep": "allow",
-        "list": "allow",
-        "skill": "allow",
-        "question": "allow",
-        "bash": {
-          "cargo *": "allow",
-          "pnpm *": "allow",
-          "rustup *": "allow",
-          "mkdir *": "allow",
-          "git status": "allow",
-          "git diff": "allow",
-          "git log *": "allow",
-          "git add *": "allow",
-          "git commit *": "deny",
-          "git push *": "deny",
-          "gh pr create": "deny",
-          "gh pr comment": "deny",
-          "gh issue create": "deny",
-          "gh pr merge": "deny",
-          "rm *": "ask",
-          "git *": "ask",
-          "gh *": "ask",
-          "*": "ask"
-        }
-      }
+      "mode": "primary"
     }
   },
   "command": {
@@ -48,11 +19,23 @@
     },
     "lint": {
       "description": "Run all linters in order: markdown fix, cargo fmt, cargo clippy",
-      "template": "pnpm fix:md && cargo fmt && cargo clippy -- -D warnings"
+      "template": "mise run markdownlint:fix && cargo fmt && cargo clippy -- -D warnings"
     },
     "build": {
       "description": "Build with cargo: cargo build [$ARGUMENTS]",
       "template": "cargo build $ARGUMENTS"
     }
+  },
+  "permission": {
+    "git commit *": "deny",
+    "git push *": "deny",
+    "gh pr create": "deny",
+    "gh pr comment": "deny",
+    "gh issue create": "deny",
+    "gh pr merge": "deny",
+    "rm *": "allow",
+    "git *": "ask",
+    "gh *": "ask",
+    "*": "allow"
   }
 }
